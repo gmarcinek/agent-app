@@ -1,0 +1,12 @@
+{
+  "goal": "Zbuduj prosty UI aplikacji TODO bez uruchomieniowego środowiska. Tylko same komponenty w katalogu src oraz index.html żeby to wszystko pokazać. Projekt powinien dać się uruchomić po wykonaniu komend instalacji paczek npm i uruchomieniu npm start za pomocą Vite. Ty jedynie piszesz pliki bo nie masz uprawnień do uruchamiania komend systemowych. Masz prawa do pisania kodu aplikacji",
+  "constraints": [
+    "Użyj Reacta, TypeScript i Vite",
+    "stwórz pliki package.json i konfiguracyjne dla vite oraz typescript uwzględniej to w dependencjach",
+    "dodaj index.html",
+    "Bez backendu",
+    "Komponenty powinny być podzielone logicznie",
+    "Nie używaj react scripts",
+    "Nie twórz tasków na budowę struktury katalogów, one powstaną samoistnie przy zapisie"
+  ]
+}

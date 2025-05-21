@@ -1,0 +1,82 @@
+[
+  {
+    "prompt": "Utwórz plik package.json z podstawową konfiguracją dla projektu React z TypeScript i Vite.",
+    "artifact": {
+      "name": "package",
+      "path": "output/package.json",
+      "extension": ".json"
+    }
+  },
+  {
+    "prompt": "Utwórz plik konfiguracyjny Vite o nazwie vite.config.ts z podstawową konfiguracją dla projektu React z TypeScript.",
+    "artifact": {
+      "name": "vite.config",
+      "path": "output/vite.config.ts",
+      "extension": ".ts"
+    }
+  },
+  {
+    "prompt": "Utwórz plik konfiguracyjny TypeScript o nazwie tsconfig.json z podstawową konfiguracją dla projektu React.",
+    "artifact": {
+      "name": "tsconfig",
+      "path": "output/tsconfig.json",
+      "extension": ".json"
+    }
+  },
+  {
+    "prompt": "Utwórz plik index.html, który będzie zawierał podstawową strukturę HTML i będzie punktem wejściowym dla aplikacji.",
+    "artifact": {
+      "name": "index",
+      "path": "output/index.html",
+      "extension": ".html"
+    }
+  },
+  {
+    "prompt": "Napisz główny komponent aplikacji o nazwie App, który będzie zawierał podstawową strukturę aplikacji TODO.",
+    "artifact": {
+      "name": "App",
+      "path": "output/src/components/App.tsx",
+      "extension": ".tsx"
+    }
+  },
+  {
+    "prompt": "Napisz komponent Header, który będzie wyświetlał nagłówek aplikacji TODO.",
+    "artifact": {
+      "name": "Header",
+      "path": "output/src/components/Header.tsx",
+      "extension": ".tsx"
+    }
+  },
+  {
+    "prompt": "Napisz komponent TodoList, który będzie wyświetlał listę zadań.",
+    "artifact": {
+      "name": "TodoList",
+      "path": "output/src/components/TodoList.tsx",
+      "extension": ".tsx"
+    }
+  },
+  {
+    "prompt": "Napisz komponent TodoItem, który będzie reprezentował pojedyncze zadanie na liście TODO.",
+    "artifact": {
+      "name": "TodoItem",
+      "path": "output/src/components/TodoItem.tsx",
+      "extension": ".tsx"
+    }
+  },
+  {
+    "prompt": "Napisz komponent AddTodo, który będzie zawierał formularz do dodawania nowych zadań do listy.",
+    "artifact": {
+      "name": "AddTodo",
+      "path": "output/src/components/AddTodo.tsx",
+      "extension": ".tsx"
+    }
+  },
+  {
+    "prompt": "Utwórz plik główny main.tsx, który będzie renderował komponent App do DOM.",
+    "artifact": {
+      "name": "main",
+      "path": "output/src/main.tsx",
+      "extension": ".tsx"
+    }
+  }
+]

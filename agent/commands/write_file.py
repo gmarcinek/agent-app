@@ -5,7 +5,7 @@ import shutil
 
 class WriteFileCommand(Command):
     def run(self, state: AgentState) -> AgentState:
-        path = self.params["path"]
+        path = self.params["params"]["path"]
         name = os.path.splitext(os.path.basename(path))[0]
 
         # 🔁 Zmieniono ścieżkę źródłową na validated

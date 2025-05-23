@@ -7,8 +7,9 @@ from agent.codegen.strategy import validate_and_recreate
 
 class GenerateCodeCommand(Command):
     def run(self, state: AgentState) -> AgentState:
-        prompt_text = self.params["prompt"]
-        artifact = self.params["artifact"]
+        print(f"📦 Params: {self.params}")
+        prompt_text = self.params["params"]["prompt"]
+        artifact = self.params["params"]["artifact"]
 
         artifact_name = artifact["name"]
         filepath = artifact["path"]

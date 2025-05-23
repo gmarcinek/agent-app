@@ -1,12 +1,10 @@
 {
-  "goal": "Zbuduj prosty UI aplikacji TODO bez uruchomieniowego środowiska. Tylko same komponenty w katalogu src oraz index.html żeby to wszystko pokazać. Projekt powinien dać się uruchomić po wykonaniu komend instalacji paczek npm i uruchomieniu npm start za pomocą Vite. Ty jedynie piszesz pliki bo nie masz uprawnień do uruchamiania komend systemowych. Masz prawa do pisania kodu aplikacji",
+  "goal": "Zainicjuj projekt Vite z React i TypeScript w katalogu 'output/app', używając komendy 'npm create vite@latest . -- --template react-ts' z katalogu roboczego 'output/app'. Następnie uruchom 'npm install' i 'npm run dev -- --port 3000' z katalogu 'app'. Nie twórz ręcznie plików, które powinny być wygenerowane przez scaffolder Vite.",
   "constraints": [
-    "Użyj Reacta, TypeScript i Vite",
-    "stwórz pliki package.json i konfiguracyjne dla vite oraz typescript uwzględniej to w dependencjach",
-    "dodaj index.html",
-    "Bez backendu",
-    "Komponenty powinny być podzielone logicznie",
-    "Nie używaj react scripts",
-    "Nie twórz tasków na budowę struktury katalogów, one powstaną samoistnie przy zapisie"
+    "Podawaj pełne ścieżki katalogów roboczych w polu 'cwd', np. 'output/app'",
+    "Nie generuj ręcznie plików typu App.tsx, index.tsx, vite.config.ts, index.html",
+    "Nie używaj create-react-app ani react-scripts",
+    "Zainstaluj zależności przed próbą uruchomienia",
+    "Projekt frontendowy ma działać w katalogu 'output/app'"
   ]
 }

@@ -109,13 +109,7 @@ def main():
         # 🔁 Jeśli działają procesy w tle – przejdź w tryb interaktywny
         if process_registry.has_active_processes():
             print("🔁 W tle działa dev-server. Przechodzę do trybu interaktywnego...")
-            while True:
-                user_input = input("🟢 Tryb interaktywny. Wpisz komendę ('exit' aby wyjść):\n> ")
-                if user_input.strip().lower() == "exit":
-                    print("👋 Kończę. Zatrzymuję wszystkie procesy...")
-                    break
-                else:
-                    print("ℹ️ Nieznana komenda. Dostępne: exit")
+            interactive_loop()
 
 if __name__ == "__main__":
     main()

@@ -33,8 +33,11 @@ def interactive_loop():
             print("⚠️ Pusty input – spróbuj jeszcze raz.")
             continue
 
-        prompt = build_scenario_prompt(user_input, constraints, mode="interactive")
-        print("\n📤 Wysyłany prompt do LLM:\n" + "="*40 + "\n" + prompt + "\n" + "="*40)
+        # 🧠 Fix prompt
+        fixed_input = fix_user_prompt(user_input)
+        print(f"🧪 Poprawiony prompt:\n→ {fixed_input}")
+
+        prompt = build_scenario_prompt(fixed_input, constraints, mode="interactive")
 
         try:
             response = llm.chat(prompt).strip()
@@ -61,3 +64,17 @@ def interactive_loop():
 
         except Exception as e:
             print(f"❌ Błąd LLM lub scenariusza:\n{e}")
+
+
+def fix_user_prompt(raw_input: str, model="gpt-4o") -> str:
+    fixer_prompt = f"""Popraw lub uzupełnij polecenie użytkownika, zachowując jego intencję.
+Usuń błędy językowe i spraw, by polecenie było możliwie jasne dla agenta AI.
+Zwróć tylko jedną poprawioną wersję bez dodatkowych komentarzy.
+
+Polecenie:
+{raw_input}
+
+Poprawione:
+"""
+    llm = LLMClient(model=model)
+    return llm.chat(fixer_prompt).strip()

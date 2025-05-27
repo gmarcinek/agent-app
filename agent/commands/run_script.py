@@ -1,5 +1,6 @@
 import subprocess
 import webbrowser
+import re
 from agent.commands.base import Command
 from agent.state import AgentState, StepResult
 from agent.runner import ScriptRunner
@@ -23,24 +24,29 @@ class RunScriptCommand(Command):
 
             process_registry.register(process)
 
-            # Otwórz w domyślnej przeglądarce
-            print("🌐 Otwieram przeglądarkę na http://localhost:3000")
-            webbrowser.open("http://localhost:3000")
+            # 🔍 Spróbuj wyciągnąć port z komendy
+            port_match = re.search(r"--port[ =](\d+)", command)
+            port = port_match.group(1) if port_match else "3000"
+            url = f"http://localhost:{port}"
 
-            # Dodaj wpis do historii, ale nie czekaj na zakończenie
+            # 🌐 Otwórz przeglądarkę z dynamicznym portem
+            print(f"🌐 Otwieram przeglądarkę: {url}")
+            webbrowser.open(url)
+
+            # 🧠 Zapisz wynik do historii
             state.history.append(StepResult(
                 step_name="run_script",
                 input=self.params,
                 output={
                     "ok": True,
-                    "stdout": "Dev server started in background.",
+                    "stdout": f"Dev server started in background on port {port}.",
                     "stderr": "",
                     "pid": process.pid
                 }
             ))
             return state
 
-        # Tryb zwykły — blokujący
+        # 🔁 Tryb blokujący (nie dev-server)
         runner = ScriptRunner()
         result = runner.run(command, cwd=cwd)
 

@@ -9,7 +9,6 @@ def build_scenario_prompt(goal: str, constraints: list[str], mode: str = "initia
 
     fs = FileSystem(base_path="output")
     file_structure = fs.get_flat_file_list_string()
-    print(f"📂 Struktura katalogu: {file_structure}")
 
     prompt = f"""
 Jesteś agentem planującym działania kodującego agenta AI.

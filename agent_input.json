@@ -5,6 +5,7 @@
     "Nie generuj ręcznie plików typu App.tsx, index.tsx, vite.config.ts, index.html",
     "Nie używaj create-react-app ani react-scripts",
     "Zainstaluj zależności przed próbą uruchomienia",
+    "Jeśli tworzysz krok scenariusza, który będzie używał potencjalnie nowej biblioteki, to zinstaluj je do zależnosci projektu",
     "Projekt frontendowy ma działać w katalogu 'output/app'"
   ]
 }

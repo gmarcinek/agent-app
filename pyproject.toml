@@ -3,20 +3,29 @@ name = "agent-app"
 version = "0.1.0"
 description = ""
 authors = ["gmarcinek <grzegorz.marcinek@gmail.com>"]
-packages = [{ include = "agent" }]
+packages = [
+    { include = "agent" },
+    { include = "analyser" }
+]
 
 [tool.poetry.dependencies]
 python = "^3.13"
 openai = ">=1.79.0,<2.0.0"
 pydantic = ">=2.11.4,<3.0.0"
 python-dotenv = ">=1.1.0,<2.0.0"
+watchdog = "^4.0.0"
+textual = "^0.44.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"
 flake8 = "^7.2.0"
 
 [tool.poetry.scripts]
-agent = "main:main"
+app = "main:main"
+agent = "agent.main:main"
+analyser = "analyser.main:main"
+analyser-watch = "analyser.run_analyser:main"
+agent-gui = "agent.gui_main:main"
 
 [build-system]
 requires = ["poetry-core>=2.0.0"]

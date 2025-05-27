@@ -6,6 +6,20 @@ from agent.input import AgentInput
 from agent.prompt.scenario_prompt_builder import build_scenario_prompt
 from agent.loop import agent_loop
 
+def should_enter_interactive_mode(agent_input: AgentInput | None, state_path: str) -> bool:
+    if not agent_input:
+        return True
+
+    if os.path.exists(state_path):
+        try:
+            state = AgentState.from_json(state_path)
+            return getattr(state, "done", False)
+        except Exception as e:
+            print(f"⚠️ Błąd przy wczytywaniu state.json: {e}")
+            return False
+
+    return False
+
 def interactive_loop():
     state_path = "output/state.json"
     scenario_path = "output/scenario.json"
@@ -64,7 +78,6 @@ def interactive_loop():
 
         except Exception as e:
             print(f"❌ Błąd LLM lub scenariusza:\n{e}")
-
 
 def fix_user_prompt(raw_input: str, model="gpt-4o") -> str:
     fixer_prompt = f"""Popraw lub uzupełnij polecenie użytkownika, zachowując jego intencję.

@@ -1,115 +1,116 @@
-from dotenv import load_dotenv
-load_dotenv()
-
+import subprocess
 import os
-import json
+import time
 import atexit
-import signal
+from registry.process_registry import process_registry
 
-# ⬇️ Upewniamy się, że katalog output istnieje
-os.makedirs("output", exist_ok=True)
-
-from agent.input import AgentInput
-from agent.planner.scenario import plan_scenario
-from agent.state import AgentState, Scenario
-from agent.loop import agent_loop
-from agent.interactive_loop import interactive_loop
-from agent.process_registry import process_registry
-
-def describe_step(step: dict) -> tuple[str, str]:
-    step_type = step.get("type", "generate_code")
-    params = step.get("params", {})
-
-    if step_type == "generate_code":
-        name = params.get("artifact", {}).get("name", "[?]")
-        path = params.get("artifact", {}).get("path", "?")
-    elif step_type == "write_file":
-        name = os.path.basename(params.get("path", "?"))
-        path = params.get("path", "?")
-    elif step_type == "mkdir":
-        name = "[mkdir]"
-        path = params.get("path", "?")
-    elif step_type == "cd":
-        name = "[cd]"
-        path = params.get("path", "?")
-    elif step_type == "run_script":
-        name = "[run]"
-        path = params.get("command", "?")
-    elif step_type == "delete":
-        name = "[delete]"
-        path = params.get("path", "?")
+def start_process(cmd, cwd=".", capture_output=True):
+    print(f"🔧 Uruchamiam komendę: {' '.join(cmd)}")
+    print(f"🔧 W katalogu: {os.path.abspath(cwd)}")
+    
+    if capture_output:
+        proc = subprocess.Popen(
+            cmd,
+            cwd=os.path.abspath(cwd),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=os.environ.copy(),
+        )
     else:
-        name = f"[{step_type}]"
-        path = "?"
+        # Przekazanie stdin/stdout/stderr do terminala - tryb interaktywny
+        proc = subprocess.Popen(
+            cmd,
+            cwd=os.path.abspath(cwd),
+            stdin=None,
+            stdout=None,
+            stderr=None,
+            text=True,
+            env=os.environ.copy(),
+        )
+    process_registry.register(proc)
+    print(f"🚀 Uruchomiono proces `{' '.join(cmd)}` (PID {proc.pid})")
+    return proc
 
-    return name, path
-
-def cleanup_background_processes():
-    print("\n🧹 Sprzątanie... Zatrzymuję procesy w tle.")
+def cleanup():
+    print("\n🧹 Sprzątanie procesów...")
     process_registry.kill_all()
 
-# Rejestruj cleanup przy wyjściu
-atexit.register(cleanup_background_processes)
-signal.signal(signal.SIGINT, lambda sig, frame: exit(0))
-signal.signal(signal.SIGTERM, lambda sig, frame: exit(0))
+atexit.register(cleanup)
 
 def main():
-    print("🔄 Wczytuję dane wejściowe agenta...")
+    print("🚀 Uruchamiam główną aplikację...")
+    
+    # Sprawdź czy poetry działa
+    try:
+        result = subprocess.run(["poetry", "--version"], capture_output=True, text=True)
+        print(f"🔧 Poetry: {result.stdout.strip()}")
+    except Exception as e:
+        print(f"❌ Błąd poetry: {e}")
+        return
 
-    scenario_path = "output/scenario.json"
-    state_path = "output/state.json"
+    analyser_cmd = ["poetry", "run", "analyser-watch", "--mode", "watch"]
+    agent_cmd = ["poetry", "run", "agent"]
 
-    if os.path.exists("agent_input.json"):
-        agent_input = AgentInput.from_file("agent_input.json")
+    print("🔧 Uruchamiam agent...")
+    # agent uruchamiamy w trybie interaktywnym - dziedziczy terminal (stdin/out/err)
+    agent_process = start_process(agent_cmd, capture_output=False)
+    
+    print("🔧 Czekam 2 sekundy przed uruchomieniem analysera...")
+    time.sleep(2)
+    
+    print("🔧 Uruchamiam analyser...")
+    # analyser uruchamiamy tak samo jak agent - bez przekierowania do pliku
+    analyser_process = start_process(analyser_cmd, capture_output=False)
+    print(f"🚀 Uruchomiono proces `{' '.join(analyser_cmd)}` (PID {analyser_process.pid})")
+
+    analyser_done_printed = False
+    agent_done_printed = False
+    
+    # Sprawdź natychmiast czy procesy żyją
+    print("🔧 Sprawdzanie statusu procesów po uruchomieniu...")
+    time.sleep(1)
+    
+    if agent_process.poll() is not None:
+        print(f"❌ Agent już nie żyje! Kod wyjścia: {agent_process.returncode}")
     else:
-        agent_input = None
-
-    # Tryb interaktywny jeśli brak inputu lub stan zakończony
-    if not agent_input or (os.path.exists(state_path) and AgentState.from_json(state_path).done):
-        interactive_loop()
+        print("✅ Agent działa")
+        
+    if analyser_process.poll() is not None:
+        print(f"❌ Analyser już nie żyje! Kod wyjścia: {analyser_process.returncode}")
     else:
-        # 📋 Scenariusz
-        if os.path.exists(scenario_path):
-            print(f"📂 Wczytuję istniejący scenariusz z: {scenario_path}")
-            with open(scenario_path, encoding="utf-8") as f:
-                steps = json.load(f)
-        else:
-            print("🧠 Generuję scenariusz z LLM...")
-            steps = plan_scenario(agent_input)
-            os.makedirs(os.path.dirname(scenario_path), exist_ok=True)
-            with open(scenario_path, "w", encoding="utf-8") as f:
-                json.dump(steps, f, indent=2, ensure_ascii=False)
-            print(f"💾 Zapisano scenariusz do: {scenario_path}")
+        print("✅ Analyser działa")
 
-        print(f"📋 Scenariusz zawiera {len(steps)} kroków:")
-        for i, step in enumerate(steps, 1):
-            name, path = describe_step(step)
-            print(f"   {i:>2}. {name} → {path}")
+    try:
+        while True:
+            agent_done = agent_process.poll() is not None
+            analyser_done = analyser_process.poll() is not None
 
-        # 🧠 Utwórz scenariusz
-        scenario = Scenario(goal=agent_input.goal, steps=steps)
+            if agent_done and analyser_done:
+                if not agent_done_printed:
+                    print(f"🛑 Agent zakończył działanie z kodem: {agent_process.returncode}")
+                    agent_done_printed = True
+                if not analyser_done_printed:
+                    print(f"🛑 Analyser zakończył działanie z kodem: {analyser_process.returncode}")
+                    analyser_done_printed = True
+                print("🛑 Oba procesy zakończyły działanie.")
+                break
 
-        # 🧠 Stan agenta
-        if os.path.exists(state_path):
-            print("📦 Wczytuję poprzedni stan agenta...")
-            state = AgentState.from_json(state_path)
-        else:
-            print("🆕 Tworzę nowy stan agenta...")
-            state = AgentState()
+            if agent_done and not agent_done_printed:
+                print(f"🛑 Agent zakończył działanie z kodem: {agent_process.returncode}")
+                agent_done_printed = True
 
-        # 🚀 Pętla agenta
-        print("🚀 Uruchamiam agenta...")
-        final_state = agent_loop(state, scenario)
+            if analyser_done and not analyser_done_printed:
+                print(f"🛑 Analyser zakończył działanie z kodem: {analyser_process.returncode}")
+                analyser_done_printed = True
 
-        # 📊 Podsumowanie
-        print(f"\n📊 Wykonano {final_state.current_step_index}/{len(scenario.steps)} kroków.")
-        final_state.to_json(state_path)
-        print("💾 Zapisano stan agenta.")
+            time.sleep(0.5)
 
-        # 🔁 Jeśli działają procesy w tle – przejdź w tryb interaktywny
-        if process_registry.has_active_processes():
-            print("🔁 W tle działa dev-server. Przechodzę do trybu interaktywnego...")
-            interactive_loop()
+    except KeyboardInterrupt:
+        print("\n⏹️ Przerwano działanie aplikacji przez użytkownika.")
+
+    finally:
+        cleanup()
 
 if __name__ == "__main__":
     main()

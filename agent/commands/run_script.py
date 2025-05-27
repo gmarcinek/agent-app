@@ -4,7 +4,7 @@ import re
 from agent.commands.base import Command
 from agent.state import AgentState, StepResult
 from agent.runner import ScriptRunner
-from agent.process_registry import process_registry
+from registry.process_registry import process_registry
 
 class RunScriptCommand(Command):
     def run(self, state: AgentState) -> AgentState:

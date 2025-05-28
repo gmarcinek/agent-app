@@ -2,7 +2,7 @@ import os
 import mimetypes
 from pathlib import Path
 from typing import List, Set
-from analyser.constants import (
+from constants.constants import (
     TEXT_EXTENSIONS, 
     COMMON_TEXT_FILES, 
     IGNORED_DIRS, 

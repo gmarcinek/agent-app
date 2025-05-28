@@ -5,7 +5,8 @@ description = ""
 authors = ["gmarcinek <grzegorz.marcinek@gmail.com>"]
 packages = [
     { include = "agent" },
-    { include = "analyser" }
+    { include = "analyser" },
+    { include = "synthetiser" }
 ]
 
 [tool.poetry.dependencies]
@@ -26,6 +27,7 @@ agent = "agent.main:main"
 analyser = "analyser.main:main"
 analyser-watch = "analyser.run_analyser:main"
 agent-gui = "agent.gui_main:main"
+synthetiser = "synthetiser.main:main"
 
 [build-system]
 requires = ["poetry-core>=2.0.0"]

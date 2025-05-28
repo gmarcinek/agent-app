@@ -49,7 +49,9 @@ def main():
         print(f"❌ Błąd poetry: {e}")
         return
 
+    # Komendy dla wszystkich procesów
     analyser_cmd = ["poetry", "run", "analyser-watch", "--mode", "watch"]
+    synthetiser_cmd = ["poetry", "run", "synthetiser", "--mode", "watch"]
     agent_cmd = ["poetry", "run", "agent"]
 
     print("🔧 Uruchamiam agent...")
@@ -60,49 +62,53 @@ def main():
     time.sleep(2)
     
     print("🔧 Uruchamiam analyser...")
-    # analyser uruchamiamy tak samo jak agent - bez przekierowania do pliku
+    # analyser uruchamiamy bez przekierowania - będzie logował do konsoli
     analyser_process = start_process(analyser_cmd, capture_output=False)
-    print(f"🚀 Uruchomiono proces `{' '.join(analyser_cmd)}` (PID {analyser_process.pid})")
-
-    analyser_done_printed = False
-    agent_done_printed = False
     
+    print("🔧 Czekam 3 sekundy przed uruchomieniem synthetiser...")
+    time.sleep(3)
+    
+    print("🔧 Uruchamiam synthetiser...")
+    # synthetiser uruchamiamy bez przekierowania - będzie logował do konsoli
+    synthetiser_process = start_process(synthetiser_cmd, capture_output=False)
+
     # Sprawdź natychmiast czy procesy żyją
     print("🔧 Sprawdzanie statusu procesów po uruchomieniu...")
     time.sleep(1)
     
-    if agent_process.poll() is not None:
-        print(f"❌ Agent już nie żyje! Kod wyjścia: {agent_process.returncode}")
-    else:
-        print("✅ Agent działa")
-        
-    if analyser_process.poll() is not None:
-        print(f"❌ Analyser już nie żyje! Kod wyjścia: {analyser_process.returncode}")
-    else:
-        print("✅ Analyser działa")
+    processes = {
+        "Agent": agent_process,
+        "Analyser": analyser_process,
+        "Synthetiser": synthetiser_process
+    }
+    
+    for name, proc in processes.items():
+        if proc.poll() is not None:
+            print(f"❌ {name} już nie żyje! Kod wyjścia: {proc.returncode}")
+        else:
+            print(f"✅ {name} działa")
 
+    # Flagi dla jednorazowego wyświetlania statusu
+    process_done_flags = {name: False for name in processes.keys()}
+    
     try:
         while True:
-            agent_done = agent_process.poll() is not None
-            analyser_done = analyser_process.poll() is not None
-
-            if agent_done and analyser_done:
-                if not agent_done_printed:
-                    print(f"🛑 Agent zakończył działanie z kodem: {agent_process.returncode}")
-                    agent_done_printed = True
-                if not analyser_done_printed:
-                    print(f"🛑 Analyser zakończył działanie z kodem: {analyser_process.returncode}")
-                    analyser_done_printed = True
-                print("🛑 Oba procesy zakończyły działanie.")
+            # Sprawdź status wszystkich procesów
+            all_done = True
+            for name, proc in processes.items():
+                is_done = proc.poll() is not None
+                
+                if is_done and not process_done_flags[name]:
+                    print(f"🛑 {name} zakończył działanie z kodem: {proc.returncode}")
+                    process_done_flags[name] = True
+                
+                if not is_done:
+                    all_done = False
+            
+            # Jeśli wszystkie procesy zakończone
+            if all_done:
+                print("🛑 Wszystkie procesy zakończyły działanie.")
                 break
-
-            if agent_done and not agent_done_printed:
-                print(f"🛑 Agent zakończył działanie z kodem: {agent_process.returncode}")
-                agent_done_printed = True
-
-            if analyser_done and not analyser_done_printed:
-                print(f"🛑 Analyser zakończył działanie z kodem: {analyser_process.returncode}")
-                analyser_done_printed = True
 
             time.sleep(0.5)
 

@@ -1,0 +1,6 @@
+{
+    "index_weight": 0.2,
+    "debug": false,
+    "batch_size": 20,
+    "debounce_delay": 0.5
+}

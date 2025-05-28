@@ -5,7 +5,7 @@ from analyser.writer import write_analysis
 from analyser.tree_parser import parse_code_file
 from agent.llm.use_llm import LLMClient
 from dotenv import load_dotenv
-from analyser.constants import LANGUAGE_MAP
+from constants.constants import LANGUAGE_MAP
 
 load_dotenv()
 

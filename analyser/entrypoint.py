@@ -1,6 +1,6 @@
 from analyser.scanner import is_text_file, should_ignore_file
 from analyser.analyser import analyze_file
-from analyser.constants import IGNORED_DIRS
+from constants.constants import IGNORED_DIRS
 from watchdog.observers import Observer
 from watchdog.events import PatternMatchingEventHandler
 import time

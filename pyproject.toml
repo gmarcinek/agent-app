@@ -15,7 +15,7 @@ openai = ">=1.79.0,<2.0.0"
 pydantic = ">=2.11.4,<3.0.0"
 python-dotenv = ">=1.1.0,<2.0.0"
 watchdog = "^4.0.0"
-textual = "^0.44.0"
+textual = {extras = ["syntax"], version = "^3.2.0"}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"
@@ -26,8 +26,8 @@ app = "main:main"
 agent = "agent.main:main"
 analyser = "analyser.main:main"
 analyser-watch = "analyser.run_analyser:main"
-agent-gui = "agent.gui_main:main"
 synthetiser = "synthetiser.main:main"
+gui-dashboard = "gui.main:main"
 
 [build-system]
 requires = ["poetry-core>=2.0.0"]

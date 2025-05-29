@@ -1,27 +1,65 @@
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, List, Set
 from textual.containers import Vertical
 from textual.widgets import TabbedContent, TabPane, Static
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.events import Mount
+from textual.message import Message
 from gui.widgets.file_view import FileView
+
 
 class TabManager(Vertical):
     """Zarządza wieloma otwartymi plikami w tabach"""
+    
+    DEFAULT_CSS = """
+    .tab-container Tab {
+        margin-right: 1;
+        padding: 0 1;
+    }
+    
+    .file-tab {
+    }
+    
+    .welcome-tab {
+    }
+    
+    .welcome-message {
+        /* Wiadomość w welcome tabie */
+        content-align: center middle;
+        width: 100%;
+        height: 100%;
+    }
+
+    .modified-tab {
+        color: yellow;
+    }
+    """
 
     BINDINGS = [
         Binding("ctrl+w", "close_active_tab", "Close Tab", priority=True),
+        Binding("ctrl+s", "save_active_tab", "Save File", priority=True),
+        Binding("ctrl+tab", "next_tab", "Next Tab", priority=True),
+        Binding("ctrl+shift+tab", "prev_tab", "Previous Tab", priority=True),
     ]
+
+    class FileModified(Message):
+        """Wiadomość informująca o modyfikacji pliku"""
+        def __init__(self, file_path: Path, modified: bool) -> None:
+            self.file_path = file_path
+            self.modified = modified
+            super().__init__()
 
     def __init__(self) -> None:
         super().__init__()
         self.open_files: Dict[Path, Tuple[str, FileView]] = {}
         self.active_file: Optional[Path] = None
+        self.modified_files: Set[Path] = set()
 
     def compose(self) -> ComposeResult:
-        with TabbedContent(id="file-tabs") as tabbed:
-            yield TabPane("Welcome", Static("📄 Select a file to open", classes="message"), id="welcome-tab")
+        with TabbedContent(id="file-tabs", classes="tab-container") as tabbed:
+            welcome_pane = TabPane("Welcome", Static("📄 Select a file to open", classes="welcome-message"), id="welcome-tab")
+            welcome_pane.add_class("welcome-tab")
+            yield welcome_pane
 
     def on_mount(self) -> None:
         """Inicjalizacja po zamontowaniu widgetu"""
@@ -41,35 +79,82 @@ class TabManager(Vertical):
             self.active_file = file_path
             return
             
-        # Stwórz nowy FileView dla tego pliku
-        file_view = FileView(file_path)
+        try:
+            # Stwórz nowy FileView dla tego pliku
+            file_view = FileView(file_path)
+            
+            # Podłącz obsługę zdarzeń od FileView
+            file_view.watch_modified(self._on_file_modified)
+            
+            # Dodaj nowy tab
+            tabbed = self.query_one(TabbedContent)
+            tab_name = file_path.name
+            
+            # Generuj unikalny ID dla taba (prosty numer)
+            tab_id = f"file_tab_{len(self.open_files)}"
+            
+            tab_pane = TabPane(tab_name, file_view, id=tab_id)
+            tab_pane.add_class("file-tab")
+            tabbed.add_pane(tab_pane)
+            
+            # Zapisz ID taba razem z FileView
+            self.open_files[file_path] = (tab_id, file_view)
+            
+            # Przełącz focus na nowo utworzony tab
+            tabbed.active = tab_id
+            self.active_file = file_path
+        except Exception as e:
+            self.notify(f"Błąd podczas otwierania pliku: {e}", severity="error")
+
+    def _on_file_modified(self, file_path: Path, modified: bool) -> None:
+        """Obsługuje zdarzenie modyfikacji pliku"""
+        if modified:
+            self.modified_files.add(file_path)
+        else:
+            self.modified_files.discard(file_path)
         
-        # Dodaj nowy tab
+        # Aktualizuj wizualny stan taba
+        self._update_tab_modified_state(file_path, modified)
+        
+        # Wyślij wiadomość o modyfikacji
+        self.post_message(self.FileModified(file_path, modified))
+
+    def _update_tab_modified_state(self, file_path: Path, modified: bool) -> None:
+        """Aktualizuje wygląd taba w zależności od stanu modyfikacji"""
+        if file_path not in self.open_files:
+            return
+            
+        tab_id, _ = self.open_files[file_path]
         tabbed = self.query_one(TabbedContent)
-        tab_name = file_path.name
         
-        # Generuj unikalny ID dla taba (prosty numer)
-        tab_id = f"file_tab_{len(self.open_files)}"
-        
-        tab_pane = TabPane(tab_name, file_view, id=tab_id)
-        tabbed.add_pane(tab_pane)
-        
-        # Zapisz ID taba razem z FileView
-        self.open_files[file_path] = (tab_id, file_view)
-        
-        # Przełącz focus na nowo utworzony tab
-        tabbed.active = tab_id
-        self.active_file = file_path
+        # Znajdź tab odpowiadający plikowi
+        for tab in tabbed.query("Tab"):
+            if tab.id == tab_id:
+                if modified:
+                    tab.add_class("modified-tab")
+                    # Dodaj gwiazdkę do nazwy taba
+                    if not tab.label.endswith("*"):
+                        tab.label = f"{tab.label}*"
+                else:
+                    tab.remove_class("modified-tab")
+                    # Usuń gwiazdkę z nazwy
+                    if tab.label.endswith("*"):
+                        tab.label = tab.label[:-1]
+                break
 
     def close_file(self, file_path: Path) -> None:
-        """Zamyka tab z plikiem"""
+        """Zamyka tab z plikiem bez pytania o zapisanie zmian"""
         if file_path not in self.open_files:
             return
             
         tab_id, file_view = self.open_files[file_path]
         
-        # Usuń z mapy
+        # Usuń z mapy i zbioru zmodyfikowanych
         del self.open_files[file_path]
+        self.modified_files.discard(file_path)
+        
+        # Odłącz obserwowanie zdarzeń
+        file_view.unwatch_modified(self._on_file_modified)
         
         # Usuń TabPane z TabbedContent
         tabbed = self.query_one(TabbedContent)
@@ -96,6 +181,45 @@ class TabManager(Vertical):
                 tabbed.active = "welcome-tab"
                 self.active_file = None
 
+    def save_file(self, file_path: Path) -> bool:
+        """Zapisuje zawartość pliku"""
+        if file_path not in self.open_files:
+            return False
+            
+        _, file_view = self.open_files[file_path]
+        try:
+            # Zapisz zawartość
+            success = file_view.save()
+            if success:
+                # Usuń z listy zmodyfikowanych
+                self.modified_files.discard(file_path)
+                # Aktualizuj stan taba
+                self._update_tab_modified_state(file_path, False)
+            return success
+        except Exception as e:
+            self.notify(f"Błąd podczas zapisywania pliku: {e}", severity="error")
+            return False
+
+    def refresh_file(self, file_path: Path) -> bool:
+        """Odświeża zawartość pliku z dysku"""
+        if file_path not in self.open_files:
+            return False
+            
+        _, file_view = self.open_files[file_path]
+        try:
+            # Odśwież zawartość
+            success = file_view.reload_from_disk()
+            if success:
+                # Usuń z listy zmodyfikowanych
+                self.modified_files.discard(file_path)
+                # Aktualizuj stan taba
+                self._update_tab_modified_state(file_path, False)
+                self.notify(f"Odświeżono plik: {file_path.name}")
+            return success
+        except Exception as e:
+            self.notify(f"Błąd podczas odświeżania pliku: {e}", severity="error")
+            return False
+
     def on_key(self, event) -> None:
         """Przechwytuj klawisze bezpośrednio"""
         if event.key == "ctrl+w":
@@ -103,11 +227,79 @@ class TabManager(Vertical):
                 self.close_file(self.active_file)
                 event.prevent_default()
                 event.stop()
+        elif event.key == "ctrl+s":
+            if self.active_file:
+                self.save_file(self.active_file)
+                event.prevent_default()
+                event.stop()
 
     def action_close_active_tab(self) -> None:
         """Zamyka aktywny tab (Ctrl+W)"""
         if self.active_file:
             self.close_file(self.active_file)
+
+    def action_save_active_tab(self) -> None:
+        """Zapisuje aktywny plik (Ctrl+S)"""
+        if self.active_file:
+            self.save_file(self.active_file)
+
+    def action_next_tab(self) -> None:
+        """Przełącza na następny tab (Ctrl+Tab)"""
+        if not self.open_files:
+            return
+            
+        tabbed = self.query_one(TabbedContent)
+        if tabbed.tab_count <= 1:
+            return
+            
+        # Pobierz listę wszystkich tabów
+        tab_ids = [tab_id for _, (tab_id, _) in self.open_files.items()]
+        if not tab_ids:
+            return
+            
+        # Jeśli aktywny plik nie istnieje, wybierz pierwszy tab
+        if not self.active_file or self.active_file not in self.open_files:
+            tabbed.active = tab_ids[0]
+            return
+            
+        # Znajdź indeks aktywnego taba
+        current_tab_id, _ = self.open_files[self.active_file]
+        try:
+            current_index = tab_ids.index(current_tab_id)
+            next_index = (current_index + 1) % len(tab_ids)
+            tabbed.active = tab_ids[next_index]
+        except ValueError:
+            # Jeśli nie znaleziono, wybierz pierwszy tab
+            tabbed.active = tab_ids[0]
+
+    def action_prev_tab(self) -> None:
+        """Przełącza na poprzedni tab (Ctrl+Shift+Tab)"""
+        if not self.open_files:
+            return
+            
+        tabbed = self.query_one(TabbedContent)
+        if tabbed.tab_count <= 1:
+            return
+            
+        # Pobierz listę wszystkich tabów
+        tab_ids = [tab_id for _, (tab_id, _) in self.open_files.items()]
+        if not tab_ids:
+            return
+            
+        # Jeśli aktywny plik nie istnieje, wybierz ostatni tab
+        if not self.active_file or self.active_file not in self.open_files:
+            tabbed.active = tab_ids[-1]
+            return
+            
+        # Znajdź indeks aktywnego taba
+        current_tab_id, _ = self.open_files[self.active_file]
+        try:
+            current_index = tab_ids.index(current_tab_id)
+            prev_index = (current_index - 1) % len(tab_ids)
+            tabbed.active = tab_ids[prev_index]
+        except ValueError:
+            # Jeśli nie znaleziono, wybierz ostatni tab
+            tabbed.active = tab_ids[-1]
 
     def on_tabbed_content_tab_activated(self, event) -> None:
         """Obsłuż przełączenie taba - aktualizuj active_file"""
@@ -122,9 +314,9 @@ class TabManager(Vertical):
         for file_path, (tab_id, file_view) in self.open_files.items():
             if tab_id == active_tab_id:
                 self.active_file = file_path
+                # Daj focus dla FileView
+                file_view.focus()
                 return
-
-    # Middle mouse nie jest niezawodny w Textual, używamy Ctrl+W
 
     def get_active_file_view(self) -> Optional[FileView]:
         """Zwraca aktywny FileView"""
@@ -133,12 +325,15 @@ class TabManager(Vertical):
             return file_view
         return None
 
-    def get_open_files_list(self) -> list[Path]:
+    def get_open_files_list(self) -> List[Path]:
         """Zwraca listę otwartych plików"""
         return list(self.open_files.keys())
 
-    def close_all_files(self) -> None:
-        """Zamyka wszystkie otwarte pliki"""
-        files_to_close = list(self.open_files.keys())
-        for file_path in files_to_close:
-            self.close_file(file_path)
+    def get_modified_files_list(self) -> List[Path]:
+        """Zwraca listę zmodyfikowanych plików"""
+        return list(self.modified_files)
+
+    def save_all_files(self) -> None:
+        """Zapisuje wszystkie zmodyfikowane pliki"""
+        for file_path in list(self.modified_files):
+            self.save_file(file_path)

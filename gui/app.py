@@ -29,7 +29,7 @@ class MainPromptSection(Static):
 class AgentDashboard(App):
     """Minimalna aplikacja - tylko struktura"""
     
-    CSS = """
+    DEFAULT_CSS = """
     Screen {
         layout: vertical;
     }
@@ -72,8 +72,8 @@ class AgentDashboard(App):
     }
 
     #prompt-panel {
-        height: 2fr;
-        min-height: 20%;
+        height: 1fr;
+        min-height: 10%;
         padding: 1;
         background: $surface;
         margin: 1 0 0 0;
@@ -115,9 +115,9 @@ class AgentDashboard(App):
                 with VerticalScroll(id="tree-panel"):
                     yield ProjectTree()
                 
-                # TabManager zamiast FileContentView
+                # TabManager 
                 with VerticalScroll(id="content-panel"):
-                    yield TabManager()  # ZMIANA: TabManager zamiast FileContentView
+                    yield TabManager()
             
             # Sekcja logów z przewijaniem
             with VerticalScroll(id="log-panel"):

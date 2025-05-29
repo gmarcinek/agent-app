@@ -1,6 +1,6 @@
 from pathlib import Path
 from textual.widgets import Tree
-from gui.widgets.file_content import FileContentView
+from gui.events import FileOpenRequest  # Dodaj ten import
 
 class ProjectTree(Tree):
     """Proste drzewo plików ze stylizacją"""
@@ -82,7 +82,7 @@ class ProjectTree(Tree):
         return path.name in skip_names
     
     def on_tree_node_selected(self, event) -> None:
-        """Obsłuż kliknięcie"""
+        """Obsłuż kliknięcie - wyślij event zamiast bezpośredniego wywołania"""
         node = event.node
         if not node:
             return
@@ -94,7 +94,6 @@ class ProjectTree(Tree):
                 file_path = Path(path_str)
                 break
         
-        # Przekaż do file viewer przez app
-        if file_path:
-            file_viewer = self.app.query_one(FileContentView) 
-            file_viewer.load_file(file_path)
+        # Wyślij event jeśli to plik
+        if file_path and file_path.is_file():
+            self.post_message(FileOpenRequest(file_path))

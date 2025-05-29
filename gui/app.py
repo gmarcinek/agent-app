@@ -1,9 +1,10 @@
 from pathlib import Path
 from textual.app import App, ComposeResult
-from textual.containers import Container, Horizontal, Vertical
+from textual.containers import Container, Horizontal, Vertical, VerticalScroll
 from textual.widgets import Static
 from gui.widgets.project_tree import ProjectTree
-from gui.widgets.file_content import FileContentView
+from gui.widgets.tab_manager import TabManager  # Zmiana: TabManager zamiast FileContentView
+from gui.events import FileOpenRequest  # Dodaj import eventu
 
 class TitleStatusBar(Static):
     """Placeholder dla title bar"""
@@ -15,18 +16,15 @@ class FolderContentView(Static):
     def compose(self) -> ComposeResult:
         yield Static("FolderContentView Widget", id="folder-placeholder")
 
-
 class LogsSection(Static):
     """Placeholder dla logs"""
     def compose(self) -> ComposeResult:
         yield Static("LogsSection Widget", id="logs-placeholder")
 
-
 class MainPromptSection(Static):
     """Placeholder dla main prompt"""
     def compose(self) -> ComposeResult:
         yield Static("MainPromptSection Widget", id="prompt-placeholder")
-
 
 class AgentDashboard(App):
     """Minimalna aplikacja - tylko struktura"""
@@ -37,7 +35,8 @@ class AgentDashboard(App):
     }
     
     #editor-section {
-        height: 1fr;
+        height: 3fr;
+        min-height: 10;
         margin: 0;
     }
     
@@ -52,7 +51,6 @@ class AgentDashboard(App):
     #content-panel {
         width: 75%;
         min-width: 20;
-        margin: 0 0 0 1;
         padding: 1;
         background: $surface;
     }
@@ -62,13 +60,11 @@ class AgentDashboard(App):
     }
 
     #log-panel {
-        height: 4;
-        min-height: 2;
+        height: 3;
+        min-height: 1;
         background: $surface;
         padding: 1;
-        background: $surface;
-        margin: 1 0 1 0;
-        padding: 1;
+        margin: 1 0 0 0;
     }
     
     MainPromptSection {
@@ -76,11 +72,11 @@ class AgentDashboard(App):
     }
 
     #prompt-panel {
-        height: 10;
+        height: 2fr;
         min-height: 20%;
         padding: 1;
         background: $surface;
-        padding: 1;
+        margin: 1 0 0 0;
     }
     
     Static {
@@ -111,36 +107,40 @@ class AgentDashboard(App):
     """
     
     def compose(self) -> ComposeResult:
+        """Komponowanie struktury aplikacji"""
         with Vertical():
-            # Section 2: Editor (resizable horizontal)
+            # Sekcja editora - podzielona poziomo na drzewo i podgląd
             with Horizontal(id="editor-section"):
-                # Tree panel
-                with Container(id="tree-panel"):
+                # Panel drzewa plików z przewijaniem
+                with VerticalScroll(id="tree-panel"):
                     yield ProjectTree()
                 
-                # Content panel
-                with Static(id="content-panel"):
-                    yield FileContentView()
+                # TabManager zamiast FileContentView
+                with VerticalScroll(id="content-panel"):
+                    yield TabManager()  # ZMIANA: TabManager zamiast FileContentView
             
-            # Section 3: Logs (resizable from top)
-            with Container(id="log-panel"):
+            # Sekcja logów z przewijaniem
+            with VerticalScroll(id="log-panel"):
                 yield LogsSection()
             
-            # Section 4: Main Prompt (resizable from logs)
-            with Container(id="prompt-panel"):
+            # Sekcja głównego promptu z przewijaniem
+            with VerticalScroll(id="prompt-panel"):
                 yield MainPromptSection()
 
+    def on_file_open_request(self, event: FileOpenRequest) -> None:
+        """Obsługuje żądanie otwarcia pliku"""
+        tab_manager = self.query_one(TabManager)
+        tab_manager.open_file(event.file_path)
+
     def on_mount(self) -> None:
-        """Po uruchomieniu pokaż placeholder w file viewer"""
+        """Inicjalizacja po uruchomieniu"""
         self.theme = "gruvbox"
-        file_viewer = self.query_one(FileContentView)
-        file_viewer.show_placeholder()
+        # Usuń linijkę z file_viewer.show_placeholder() - nie potrzebna
 
 def main():
     """Entry point"""
     app = AgentDashboard()
     app.run()
-
 
 if __name__ == "__main__":
     main()

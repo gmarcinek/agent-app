@@ -30,7 +30,7 @@ Każdy krok powinien mieć strukturę:
 Dostępne typy kroków:
 - "mkdir": {{ "path": "src/components" }}
 - "run_script": {{ 
-    "command": "npm install",
+    "command": "npm install", // jeśli to dev serwer zawsze podawaj --port na którym ma sie uruchomić
     "cwd": "output",
     "dev_server_mode": true | false // jeśli to skrypt uruchamiający dev server to niech nie blokuje terminala
   }} // zawsze działaj w obrębie cwd output lub głębiej

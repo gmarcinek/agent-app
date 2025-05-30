@@ -1,4 +1,5 @@
 import os
+import psutil  # ✅ Dodaj psutil dla ubijania dzieci
 # Wymuś UTF-8 na Windows
 os.environ['PYTHONIOENCODING'] = 'utf-8'
 os.environ['PYTHONUTF8'] = '1'
@@ -14,8 +15,8 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
-# Usuń import registry jeśli nie istnieje
-# from registry.process_registry import process_registry
+# ✅ Dodaj registry
+from registry.process_registry import process_registry
 
 class ProcessStatus(Enum):
     STOPPED = "stopped"
@@ -54,6 +55,11 @@ class ProcessManager:
         for name in self.commands:
             self.process_status[name] = ProcessStatus.STOPPED
     
+    def get_project_root(self) -> Path:
+        """Zwraca katalog główny projektu (root/)"""
+        # Z root/gui/process_manager.py wracamy do root/
+        return Path(__file__).parent.parent
+    
     def add_log_handler(self, handler: Callable[[LogEntry], None]):
         """Dodaje handler do obsługi logów"""
         self.log_handlers.append(handler)
@@ -84,15 +90,19 @@ class ProcessManager:
             self._emit_log("manager", f"Starting {name}...")
             
             cmd = self.commands[name]
+            project_root = str(self.get_project_root())  # ✅ Użyj root/ zamiast gui/
             
-            # Agent w trybie interaktywnym potrzebuje specjalnego traktowania
+            # Loguj CWD dla debugowania
+            self._emit_log("manager", f"Starting {name} in directory: {project_root}")
+            
+            # Agent z pipe'ami - teraz powinien działać
             if name == "agent":
                 proc = subprocess.Popen(
                     cmd,
-                    cwd=os.getcwd(),
-                    stdout=subprocess.PIPE,
+                    cwd=project_root,
+                    stdout=subprocess.PIPE,  # ✅ Logi do GUI
                     stderr=subprocess.PIPE,
-                    stdin=subprocess.PIPE,  # Dla komunikacji z agentem
+                    stdin=subprocess.PIPE,
                     text=True,
                     env=os.environ.copy(),
                     bufsize=1,
@@ -103,7 +113,7 @@ class ProcessManager:
             else:
                 proc = subprocess.Popen(
                     cmd,
-                    cwd=os.getcwd(),
+                    cwd=project_root,  # ✅ Poprawiony CWD
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
@@ -115,13 +125,13 @@ class ProcessManager:
                 )
             
             self.processes[name] = proc
-            # process_registry.register(proc)  # Odkomentuj jeśli masz registry
+            process_registry.register(proc)  # ✅ Rejestruj proces
             
-            # Uruchom monitoring tego procesu
+            # Uruchom monitoring tego procesu (dla wszystkich procesów)
             self._start_process_monitoring(name)
             
             self.process_status[name] = ProcessStatus.RUNNING
-            self._emit_log("manager", f"{name} started (PID: {proc.pid})")
+            self._emit_log("manager", f"{name} started (PID: {proc.pid}) in {project_root}")
             
             return True
             
@@ -171,12 +181,75 @@ class ProcessManager:
     
     def stop_all(self):
         """Zatrzymuje wszystkie procesy"""
+        # ✅ Debug - sprawdź czy się wywołuje
+        print("🛑 DEBUG: stop_all() called!")
+        self._emit_log("manager", "🛑 Stopping all processes via registry...")
+        
+        # Sprawdź ile procesów jest aktywnych
+        active_count = len([p for p in self.processes.values() if p.poll() is None])
+        print(f"🛑 DEBUG: Active processes: {active_count}")
+        self._emit_log("manager", f"Active processes before kill: {active_count}")
+        
+        # ✅ Ubij drzewo procesów (parent + dzieci)
+        self._kill_process_trees()
+        
+        process_registry.kill_all()
+        
+        # Sprawdź czy faktycznie umarły
+        time.sleep(1)
+        remaining = len([p for p in self.processes.values() if p.poll() is None])
+        print(f"🛑 DEBUG: Remaining processes after kill: {remaining}")
+        self._emit_log("manager", f"Remaining processes after kill: {remaining}")
+        
+        # Zatrzymaj monitoring
+        self.stop_monitoring.set()
+        
+        # Wyczyść lokalne struktury
         for name in list(self.processes.keys()):
-            self.stop_process(name)
+            self.process_status[name] = ProcessStatus.STOPPED
+            self._emit_log("manager", f"{name} stopped via registry")
+        
+        self.processes.clear()
         
         if self.monitor_thread:
-            self.stop_monitoring.set()
             self.monitor_thread.join(timeout=5)
+    
+    def _kill_process_trees(self):
+        """Ubija procesy wraz z ich dziećmi (dev server problem)"""
+        for name, proc in self.processes.items():
+            if proc.poll() is None:  # Proces żyje
+                try:
+                    # Użyj psutil do ubicia całego drzewa
+                    parent = psutil.Process(proc.pid)
+                    children = parent.children(recursive=True)
+                    
+                    # Ubij dzieci
+                    for child in children:
+                        try:
+                            child.terminate()
+                        except psutil.NoSuchProcess:
+                            pass
+                    
+                    # Ubij rodzica
+                    parent.terminate()
+                    
+                    # Poczekaj na zakończenie
+                    gone, alive = psutil.wait_procs(children + [parent], timeout=3)
+                    
+                    # Jeśli coś zostało, zabij na siłę
+                    for p in alive:
+                        try:
+                            p.kill()
+                        except psutil.NoSuchProcess:
+                            pass
+                    
+                    self._emit_log("manager", f"Killed process tree for {name} (PID: {proc.pid})")
+                    
+                except (psutil.NoSuchProcess, ProcessLookupError):
+                    # Proces już nie istnieje
+                    pass
+                except Exception as e:
+                    self._emit_log("manager", f"Error killing process tree for {name}: {e}", "error")
     
     def _start_process_monitoring(self, name: str):
         """Uruchamia monitoring pojedynczego procesu"""

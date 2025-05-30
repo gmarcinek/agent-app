@@ -37,9 +37,6 @@ class TabManager(Vertical):
 
     BINDINGS = [
         Binding("ctrl+w", "close_active_tab", "Close Tab", priority=True),
-        Binding("ctrl+s", "save_active_tab", "Save File", priority=True),
-        Binding("ctrl+tab", "next_tab", "Next Tab", priority=True),
-        Binding("ctrl+shift+tab", "prev_tab", "Previous Tab", priority=True),
     ]
 
     class FileModified(Message):
@@ -237,69 +234,6 @@ class TabManager(Vertical):
         """Zamyka aktywny tab (Ctrl+W)"""
         if self.active_file:
             self.close_file(self.active_file)
-
-    def action_save_active_tab(self) -> None:
-        """Zapisuje aktywny plik (Ctrl+S)"""
-        if self.active_file:
-            self.save_file(self.active_file)
-
-    def action_next_tab(self) -> None:
-        """Przełącza na następny tab (Ctrl+Tab)"""
-        if not self.open_files:
-            return
-            
-        tabbed = self.query_one(TabbedContent)
-        if tabbed.tab_count <= 1:
-            return
-            
-        # Pobierz listę wszystkich tabów
-        tab_ids = [tab_id for _, (tab_id, _) in self.open_files.items()]
-        if not tab_ids:
-            return
-            
-        # Jeśli aktywny plik nie istnieje, wybierz pierwszy tab
-        if not self.active_file or self.active_file not in self.open_files:
-            tabbed.active = tab_ids[0]
-            return
-            
-        # Znajdź indeks aktywnego taba
-        current_tab_id, _ = self.open_files[self.active_file]
-        try:
-            current_index = tab_ids.index(current_tab_id)
-            next_index = (current_index + 1) % len(tab_ids)
-            tabbed.active = tab_ids[next_index]
-        except ValueError:
-            # Jeśli nie znaleziono, wybierz pierwszy tab
-            tabbed.active = tab_ids[0]
-
-    def action_prev_tab(self) -> None:
-        """Przełącza na poprzedni tab (Ctrl+Shift+Tab)"""
-        if not self.open_files:
-            return
-            
-        tabbed = self.query_one(TabbedContent)
-        if tabbed.tab_count <= 1:
-            return
-            
-        # Pobierz listę wszystkich tabów
-        tab_ids = [tab_id for _, (tab_id, _) in self.open_files.items()]
-        if not tab_ids:
-            return
-            
-        # Jeśli aktywny plik nie istnieje, wybierz ostatni tab
-        if not self.active_file or self.active_file not in self.open_files:
-            tabbed.active = tab_ids[-1]
-            return
-            
-        # Znajdź indeks aktywnego taba
-        current_tab_id, _ = self.open_files[self.active_file]
-        try:
-            current_index = tab_ids.index(current_tab_id)
-            prev_index = (current_index - 1) % len(tab_ids)
-            tabbed.active = tab_ids[prev_index]
-        except ValueError:
-            # Jeśli nie znaleziono, wybierz ostatni tab
-            tabbed.active = tab_ids[-1]
 
     def on_tabbed_content_tab_activated(self, event) -> None:
         """Obsłuż przełączenie taba - aktualizuj active_file"""

@@ -17,6 +17,7 @@ from gui.process_manager import ProcessManager
 from gui.widgets.logs_section import LogsSection
 from gui.widgets.prompt_section import ScenarioPromptSection
 from gui.widgets.process_footer import ProcessFooter
+from gui.widgets.main_content_panel import MainContentPanel
 
 class FolderContentView(Static):
     """Placeholder dla folder content - może zostać rozwinięte później"""
@@ -53,23 +54,10 @@ class AgentDashboard(App):
         background: $surface;
     }
     
-    #log-panel {
-        width: 100%;
-        background: $surface;
-        padding: 1;
-        margin: 0;
-    }
-    
     #prompt-panel {
-        height: 3;
+        height: 1fr;
         background: transparent;
         margin: 1;
-    }
-    
-    #logs-display {
-        height: 1fr;
-        scrollbar-size-vertical: 0;
-        scrollbar-size-horizontal: 0;
     }
     
     #interactive-input {
@@ -97,33 +85,27 @@ class AgentDashboard(App):
     def compose(self) -> ComposeResult:
         """Komponowanie struktury aplikacji"""
         with Vertical():
-            # Sekcja editora - podzielona poziomo na drzewo i podgląd
+            # Sekcja editora - podzielona poziomo na drzewo i główny panel
             with Horizontal(id="editor-section"):
                 # Panel drzewa plików z przewijaniem
                 with VerticalScroll(id="tree-panel"):
                     yield ProjectTree()
                 
-                # TabManager 
+                # MainContentPanel z zakładkami Logi/Editor
                 with VerticalScroll(id="content-panel"):
-                    yield TabManager()
-            
-            
+                    yield MainContentPanel(self.process_manager)
             
             # Sekcja głównego promptu
             with VerticalScroll(id="prompt-panel"):
                 yield ScenarioPromptSection(self.process_manager)
-
-            # Sekcja logów
-            with VerticalScroll(id="log-panel"):
-                yield LogsSection(self.process_manager)
-            
             
             # Footer z mikroskopijnymi kontrolkami
             yield ProcessFooter(self.process_manager)
 
     def on_file_open_request(self, event: FileOpenRequest) -> None:
         """Obsługuje żądanie otwarcia pliku"""
-        tab_manager = self.query_one(TabManager)
+        main_panel = self.query_one(MainContentPanel)
+        tab_manager = main_panel.get_tab_manager()
         tab_manager.open_file(event.file_path)
     
     def on_scenario_prompt_section_prompt_submitted(self, event) -> None:

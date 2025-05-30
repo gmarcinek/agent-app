@@ -1,14 +1,15 @@
 """
-MainContentPanel - główny panel z zakładkami Logi/Editor
+MainContentPanel - główny panel z zakładkami Logi A/B Test/Editor
 """
 from textual.app import ComposeResult
 from textual.containers import Container
 from textual.widgets import TabbedContent, TabPane, Static
 from gui.widgets.tab_manager import TabManager
-from gui.widgets.logs_section import LogsSection
+from gui.widgets.logs_section import LogsSection as LogsSectionTextArea
+from gui.widgets.logs_section_richlog import LogsSectionRichLog
 
 class MainContentPanel(Container):
-    """Panel główny z zakładkami Logi i Editor"""
+    """Panel główny z zakładkami Logi A/B Test i Editor"""
     
     DEFAULT_CSS = """
     MainContentPanel {
@@ -30,7 +31,10 @@ class MainContentPanel(Container):
         padding: 0 1;
     }
     
-    .logs-tab {
+    .logs-textarea-tab {
+    }
+    
+    .logs-richlog-tab {
     }
     
     .editor-tab {
@@ -59,29 +63,40 @@ class MainContentPanel(Container):
     
     def compose(self) -> ComposeResult:
         """Komponowanie panelu z zakładkami"""
-        with TabbedContent(initial="logs", classes="main-tab-container") as tabbed:
-            # Zakładka z logami
-            logs_pane = TabPane("Logi", id="logs")
-            logs_pane.add_class("logs-tab")
-            yield logs_pane
+        with TabbedContent(initial="logs-textarea", classes="main-tab-container") as tabbed:
+            # Zakładka z logami - TextArea
+            logs_textarea_pane = TabPane("📝 Logi (TextArea)", id="logs-textarea")
+            logs_textarea_pane.add_class("logs-textarea-tab")
+            yield logs_textarea_pane
+            
+            # Zakładka z logami - RichLog
+            logs_richlog_pane = TabPane("🎨 Logi (RichLog)", id="logs-richlog")
+            logs_richlog_pane.add_class("logs-richlog-tab")
+            yield logs_richlog_pane
             
             # Zakładka z edytorem
-            editor_pane = TabPane("Editor", id="editor")
+            editor_pane = TabPane("📄 Editor", id="editor")
             editor_pane.add_class("editor-tab")
             yield editor_pane
     
     def on_mount(self) -> None:
         """Inicjalizacja po zamontowaniu - dodaj content do tabów"""
-        # Dodaj LogsSection do zakładki Logi
-        logs_pane = self.query_one("#logs", TabPane)
-        logs_pane.mount(LogsSection(self.process_manager))
+        # Dodaj LogsSection TextArea do pierwszej zakładki
+        logs_textarea_pane = self.query_one("#logs-textarea", TabPane)
+        logs_textarea_pane.mount(LogsSectionTextArea(self.process_manager))
+        
+        # Dodaj LogsSection RichLog do drugiej zakładki
+        logs_richlog_pane = self.query_one("#logs-richlog", TabPane)
+        logs_richlog_pane.mount(LogsSectionRichLog(self.process_manager))
         
         # Dodaj TabManager do zakładki Editor
         editor_pane = self.query_one("#editor", TabPane)
         editor_pane.mount(TabManager())
         
-        # Ustaw domyślną zakładkę na Logi
+        # Ustaw domyślną zakładkę na TextArea Logi
         tabbed = self.query_one(TabbedContent)
-        tabbed.active = "logs"
+        tabbed.active = "logs-textarea"
+    
+    def get_tab_manager(self) -> TabManager:
         """Zwraca TabManager dla dostępu z zewnątrz"""
         return self.query_one(TabManager)

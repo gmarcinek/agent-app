@@ -7,7 +7,7 @@ from textual.app import ComposeResult
 from textual.message import Message
 from textual.reactive import reactive
 
-from gui.process_manager import ProcessManager, LogEntry
+from registry.process_manager import ProcessManager
 
 class ScenarioPromptSection(Static):
     """Widget do wprowadzania promptów dla interactive loop agenta"""

@@ -1,10 +1,11 @@
 """
-LogsSection - widget do wyświetlania logów z GlobalLogHub
+LogsSectionRichLog - widget do wyświetlania logów z GlobalLogHub
 """
 from textual.app import ComposeResult
 from textual.containers import Vertical, VerticalScroll
-from textual.widgets import Static, TextArea
+from textual.widgets import Static, RichLog
 from textual.reactive import reactive
+from rich.text import Text
 from typing import Optional, List
 
 # Import nowego systemu logowania
@@ -12,11 +13,11 @@ from logger import get_log_hub, LogLevel, LogEntry
 from logger import CompactFormatter
 
 
-class LogsSection(Vertical):
+class LogsSectionRichLog(Vertical):
     """Sekcja wyświetlająca logi z GlobalLogHub"""
     
     DEFAULT_CSS = """
-    LogsSection {
+    LogsSectionRichLog {
         height: 1fr;
         width: 100%;
         padding: 0;
@@ -33,10 +34,8 @@ class LogsSection(Vertical):
     #logs-display {
         height: 1fr;
         width: 100%;
-        padding: 1;
+        padding: 0 1;
         background: $surface;
-        scrollbar-size-vertical: 1;
-        scrollbar-size-horizontal: 0;
     }
     
     #logs-header {
@@ -71,10 +70,11 @@ class LogsSection(Vertical):
         """Komponowanie widgetu"""
         with VerticalScroll(id="logs-container"):
             yield Static("📋 Logi systemowe", id="logs-header")
-            yield TextArea(
-                text="",
-                read_only=True,
-                show_line_numbers=False,
+            yield RichLog(
+                highlight=True,
+                markup=True,
+                auto_scroll=True,
+                wrap=True,
                 id="logs-display"
             )
     
@@ -105,10 +105,8 @@ class LogsSection(Vertical):
         # Ogranicz liczbę wyświetlanych logów
         if len(self.displayed_logs) > self.max_displayed_logs:
             self.displayed_logs = self.displayed_logs[-self.max_displayed_logs:]
-            # Odśwież display gdy przekroczymy limit
-            self._refresh_display_from_memory()
         
-        # Wyświetl w TextArea
+        # Wyświetl w RichLog
         self._display_log_entry(entry)
     
     def _on_legacy_log(self, log_message) -> None:
@@ -128,22 +126,52 @@ class LogsSection(Vertical):
         return True
     
     def _display_log_entry(self, entry: LogEntry) -> None:
-        """Wyświetl pojedynczy log w TextArea"""
-        text_area = self.query_one("#logs-display", TextArea)
+        """Wyświetl pojedynczy log w RichLog"""
+        rich_log = self.query_one("#logs-display", RichLog)
         
-        # Formatuj log jako zwykły tekst
+        # Formatuj log
         formatted_text = self.formatter.format_entry(entry)
         
-        # Dodaj do TextArea
-        current_text = text_area.text
-        if current_text:
-            text_area.text = current_text + "\n" + formatted_text
-        else:
-            text_area.text = formatted_text
+        # Konwertuj na Rich Text z kolorami
+        rich_text = self._create_rich_text(entry, formatted_text)
         
-        # Auto-scroll do końca jeśli włączone
-        if self.auto_scroll:
-            text_area.cursor_position = len(text_area.text)
+        # Dodaj do RichLog
+        rich_log.write(rich_text)
+    
+    def _create_rich_text(self, entry: LogEntry, formatted_text: str) -> Text:
+        """Tworzy Rich Text z kolorami dla log entry"""
+        text = Text()
+        
+        # Kolor bazujący na poziomie loga
+        level_colors = {
+            LogLevel.DEBUG: "dim white",
+            LogLevel.INFO: "white",
+            LogLevel.WARN: "yellow",
+            LogLevel.ERROR: "red"
+        }
+        
+        # Kolor bazujący na module
+        module_colors = {
+            "MANAGER": "blue",
+            "AGENT": "green", 
+            "SYNTHETISER": "yellow",
+            "GUI": "purple"
+        }
+        
+        color = level_colors.get(entry.level, "white")
+        
+        # Dodaj tekst z kolorami
+        parts = formatted_text.split('] ', 1)
+        if len(parts) == 2:
+            # Timestamp i część przed ]
+            text.append(parts[0] + '] ', style="dim")
+            
+            # Reszta z kolorem poziomu
+            text.append(parts[1], style=color)
+        else:
+            text.append(formatted_text, style=color)
+        
+        return text
     
     def _load_existing_logs(self) -> None:
         """Załaduj istniejące logi z hub'a"""
@@ -154,45 +182,10 @@ class LogsSection(Vertical):
                 self.displayed_logs.append(entry)
                 self._display_log_entry(entry)
     
-    def _refresh_display_from_memory(self) -> None:
-        """Odśwież wyświetlanie z pamięci (np. po przekroczeniu limitu)"""
-        text_area = self.query_one("#logs-display", TextArea)
-        
-        # Zbuduj tekst z displayed_logs
-        log_lines = []
-        for entry in self.displayed_logs:
-            if self._should_display_entry(entry):
-                formatted_text = self.formatter.format_entry(entry)
-                log_lines.append(formatted_text)
-        
-        # Ustaw cały tekst naraz
-        text_area.text = "\n".join(log_lines)
-        
-        # Auto-scroll do końca
-        if self.auto_scroll:
-            text_area.cursor_position = len(text_area.text)
-    
-    # Metody filtrowania
-    def filter_by_module(self, module: str) -> None:
-        """Filtruj logi według modułu"""
-        self.current_filter_module = module
-        self._refresh_display_from_memory()
-    
-    def filter_by_level(self, level: str) -> None:
-        """Filtruj logi według poziomu"""
-        self.current_filter_level = level
-        self._refresh_display_from_memory()
-    
-    def clear_filters(self) -> None:
-        """Wyczyść wszystkie filtry"""
-        self.current_filter_module = ""
-        self.current_filter_level = ""
-        self._refresh_display_from_memory()
-    
     def clear_logs(self) -> None:
         """Wyczyść wyświetlane logi"""
-        text_area = self.query_one("#logs-display", TextArea)
-        text_area.text = ""
+        rich_log = self.query_one("#logs-display", RichLog)
+        rich_log.clear()
         self.displayed_logs.clear()
     
     def export_logs(self, format: str = "txt") -> str:
@@ -206,17 +199,55 @@ class LogsSection(Vertical):
         else:
             raise ValueError(f"Unsupported format: {format}")
     
-    def toggle_auto_scroll(self) -> None:
-        """Przełącz auto-scroll"""
-        self.auto_scroll = not self.auto_scroll
-    
     def on_key(self, event) -> None:
         """Obsługa skrótów klawiszowych"""
-        if event.key == "ctrl+l":
-            # Wyczyść logi (Ctrl+L jak w terminalu)
+        if event.key == "ctrl+c":
+            # Kopiuj wszystkie logi
+            self._copy_logs_to_clipboard()
+            event.prevent_default()
+        elif event.key == "ctrl+l":
+            # Wyczyść logi
             self.clear_logs()
             event.prevent_default()
-        # Ctrl+C i Ctrl+A są obsługiwane natywnie przez TextArea
+    
+    def _copy_logs_to_clipboard(self) -> None:
+        """Kopiuj logi do clipboard"""
+        try:
+            # Pobierz wszystkie wyświetlane logi jako tekst
+            logs_text = self.export_logs(format="txt")
+            
+            # Spróbuj skopiować do clipboard
+            import pyperclip
+            pyperclip.copy(logs_text)
+            
+            # Powiadom użytkownika
+            self.notify("📋 Logi skopiowane do schowka!", severity="information")
+            
+        except ImportError:
+            # Jeśli pyperclip nie jest dostępne, zapisz do pliku
+            self._save_logs_to_file()
+        except Exception as e:
+            self.notify(f"❌ Błąd kopiowania: {e}", severity="error")
+    
+    def _save_logs_to_file(self) -> None:
+        """Zapisz logi do pliku jako backup"""
+        try:
+            from pathlib import Path
+            from datetime import datetime
+            
+            # Nazwa pliku z timestampem
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"logs_export_{timestamp}.txt"
+            filepath = Path(filename)
+            
+            # Zapisz logi
+            logs_text = self.export_logs(format="txt")
+            filepath.write_text(logs_text, encoding="utf-8")
+            
+            self.notify(f"📄 Logi zapisane do {filename}", severity="information")
+            
+        except Exception as e:
+            self.notify(f"❌ Błąd zapisu: {e}", severity="error")
     
     def on_unmount(self) -> None:
         """Cleanup przy odmontowywaniu"""

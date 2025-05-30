@@ -5,8 +5,11 @@ from agent.llm.use_llm import LLMClient
 from agent.input import AgentInput
 from agent.prompt.scenario_prompt_builder import build_scenario_prompt
 from agent.loop import agent_loop
+from logger import get_log_hub
 
 def should_enter_interactive_mode(agent_input: AgentInput | None, state_path: str) -> bool:
+    log_hub = get_log_hub()
+    
     if not agent_input:
         return True
 
@@ -15,12 +18,14 @@ def should_enter_interactive_mode(agent_input: AgentInput | None, state_path: st
             state = AgentState.from_json(state_path)
             return getattr(state, "done", False)
         except Exception as e:
-            print(f"⚠️ Błąd przy wczytywaniu state.json: {e}")
+            log_hub.error("AGENT", f"⚠️ Błąd przy wczytywaniu state.json: {e}")
             return False
 
     return False
 
 def interactive_loop():
+    log_hub = get_log_hub()
+    
     state_path = "output/state.json"
     scenario_path = "output/scenario.json"
     log_path = "output/logs/interactive_raw.txt"
@@ -44,12 +49,12 @@ def interactive_loop():
     while True:
         user_input = input("🟢 Podaj nowy cel działania agenta:\n> ").strip()
         if not user_input:
-            print("⚠️ Pusty input – spróbuj jeszcze raz.")
+            log_hub.warn("AGENT", "⚠️ Pusty input – spróbuj jeszcze raz")
             continue
 
         # 🧠 Fix prompt
         fixed_input = fix_user_prompt(user_input)
-        print(f"🧪 Poprawiony prompt:\n→ {fixed_input}")
+        log_hub.info("AGENT", f"🧪 Poprawiony prompt: {fixed_input}")
 
         prompt = build_scenario_prompt(fixed_input, constraints, mode="interactive")
 
@@ -66,7 +71,7 @@ def interactive_loop():
             if not isinstance(steps_batch, list):
                 raise ValueError("LLM powinien zwrócić listę kroków")
 
-            print(f"📥 Dodano {len(steps_batch)} kroków.")
+            log_hub.info("AGENT", f"📥 Dodano {len(steps_batch)} kroków")
             steps.extend(steps_batch)
 
             with open(scenario_path, "w", encoding="utf-8") as f:
@@ -77,9 +82,11 @@ def interactive_loop():
             state.to_json(state_path)
 
         except Exception as e:
-            print(f"❌ Błąd LLM lub scenariusza:\n{e}")
+            log_hub.error("AGENT", f"❌ Błąd LLM lub scenariusza: {e}")
 
 def fix_user_prompt(raw_input: str, model="gpt-4o") -> str:
+    log_hub = get_log_hub()
+    
     fixer_prompt = f"""Popraw lub uzupełnij polecenie użytkownika, zachowując jego intencję.
 Usuń błędy językowe i spraw, by polecenie było możliwie jasne dla agenta AI.
 Zwróć tylko jedną poprawioną wersję bez dodatkowych komentarzy.
@@ -89,5 +96,11 @@ Polecenie:
 
 Poprawione:
 """
-    llm = LLMClient(model=model)
-    return llm.chat(fixer_prompt).strip()
+    try:
+        llm = LLMClient(model=model)
+        result = llm.chat(fixer_prompt).strip()
+        log_hub.debug("AGENT", f"🔧 Prompt poprawiony: '{raw_input}' → '{result}'")
+        return result
+    except Exception as e:
+        log_hub.error("AGENT", f"❌ Błąd poprawiania promptu: {e}")
+        return raw_input  # Fallback do oryginalnego

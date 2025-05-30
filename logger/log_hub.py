@@ -46,6 +46,7 @@ class GlobalLogHub:
         self.register_module("AGENT", "🤖", "green") 
         self.register_module("SYNTHETISER", "🔧", "yellow")
         self.register_module("GUI", "🖥️", "purple")
+        self.register_module("FILESYSTEM", "📁", "white")
     
     @classmethod
     def get_instance(cls) -> 'GlobalLogHub':

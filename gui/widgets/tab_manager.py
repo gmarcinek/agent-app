@@ -194,7 +194,7 @@ class TabManager(Vertical):
                 # Usuń z listy zmodyfikowanych
                 self.modified_files.discard(file_path)
                 # Aktualizuj stan taba
-                self._update_tab_modified_state(file_path, False)
+                self._update_tab_modified_state(file_path, False)   
             return success
         except Exception as e:
             self.notify(f"Błąd podczas zapisywania pliku: {e}", severity="error")

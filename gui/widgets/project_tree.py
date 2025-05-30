@@ -1,99 +1,92 @@
+"""
+Projekt Tree Widget z automatycznym odświeżaniem
+"""
+import os
 from pathlib import Path
-from textual.widgets import Tree
-from gui.events import FileOpenRequest  # Dodaj ten import
+from textual.widgets import DirectoryTree
+from textual.message import Message
 
-class ProjectTree(Tree):
-    """Proste drzewo plików ze stylizacją"""
-    
-    # Minimalne CSS - tylko padding
+class ProjectTree(DirectoryTree):
+    """Drzewo projektu z automatycznym odświeżaniem"""
     DEFAULT_CSS = """
     ProjectTree {
         padding: 1 2;
     }
     """
-    
     def __init__(self):
-        self.root_path = self._find_output_folder()
-        super().__init__(f"{self.root_path.name}/")
+        # Ustaw domyślny katalog na 'output' jeśli istnieje, inaczej katalog główny
+        root_path = Path("output") if Path("output").exists() else Path(".")
+        super().__init__(root_path)
+        
+        # Timer do automatycznego odświeżania co 3 sekundy
+        self.auto_refresh_enabled = True
+        
+        # Wymuś pokazanie root jako expandable
         self.show_root = True
-        self.show_guides = True
-        
-        # Mapa ścieżek do węzłów
-        self.path_to_node = {}
-        
-    def _find_output_folder(self) -> Path:
-        """Znajdź folder output"""
-        current_dir = Path.cwd()
-        
-        possible_paths = [
-            current_dir / "output",
-            current_dir.parent / "output",
-        ]
-        
-        for path in possible_paths:
-            if path.exists() and path.is_dir():
-                return path.resolve()
-        
-        return current_dir
     
-    def on_mount(self) -> None:
-        """Zbuduj drzewo"""
-        self._build_tree(self.root, self.root_path)
-        self.root.expand()  
-        
-        # Otwórz też katalog app jeśli istnieje
-        app_path = self.root_path / "app"
-        if str(app_path) in self.path_to_node:
-            self.path_to_node[str(app_path)].expand()
-        
-    def _build_tree(self, parent_node, dir_path: Path):
-        """Zbuduj zawartość katalogu"""
-        self.path_to_node[str(dir_path)] = parent_node
-        
+    def on_mount(self):
+        """Uruchom timer auto-refresh po zamontowaniu"""
+        if self.auto_refresh_enabled:
+            self.set_interval(3.0, self.auto_refresh)
+    
+    def auto_refresh(self):
+        """Automatyczne odświeżanie zawartości drzewa"""
         try:
-            items = list(dir_path.iterdir())
-            items.sort(key=lambda x: (not x.is_dir(), x.name.lower()))
-            
-            for item in items:
-                if self._should_skip(item):
-                    continue
-                    
-                if item.is_dir():
-                    # Katalog - dodaj węzeł
-                    dir_node = parent_node.add(item.name)
-                    self.path_to_node[str(item)] = dir_node
-                    # Zbuduj zawartość (ale węzeł będzie zamknięty)
-                    self._build_tree(dir_node, item)
-                else:
-                    # Plik - dodaj liść
-                    file_node = parent_node.add_leaf(item.name)
-                    self.path_to_node[str(item)] = file_node
-                    
-        except (PermissionError, OSError):
-            parent_node.add_leaf("Access denied")
+            # Sprawdź czy root path dalej istnieje
+            if self.path.exists():
+                # Użyj wbudowanej metody reload()
+                self.reload()
+            else:
+                # Jeśli katalog nie istnieje, przełącz na katalog główny
+                self.path = Path(".")
+                self.reload()
+        except Exception as e:
+            # W przypadku błędu, zatrzymaj auto-refresh
+            self.app.notify(f"⚠️ Auto-refresh error: {e}", severity="warning")
     
-    def _should_skip(self, path: Path) -> bool:
-        """Sprawdź czy pominąć"""
-        skip_names = {
-            '__pycache__', '.git', '.vscode', 'node_modules', 'context', 'scenario.json',
-            'state.json', 'logs', '.pytest_cache', '.mypy_cache', 'venv', '.venv'
-        }
-        
-        return path.name in skip_names
+    def on_directory_tree_file_selected(self, event):
+        """Obsługa wyboru pliku"""
+        from gui.events import FileOpenRequest
+        # Wyślij event do głównej aplikacji - używaj event.path zamiast tworzyć własny
+        self.post_message(FileOpenRequest(event.path))
     
-    def on_tree_node_selected(self, event) -> None:
-        """Obsłuż kliknięcie - wyślij event zamiast bezpośredniego wywołania"""
-        node = event.node
-        if not node:
-            return
+    def toggle_auto_refresh(self):
+        """Przełącz auto-refresh on/off"""
+        self.auto_refresh_enabled = not self.auto_refresh_enabled
+        if self.auto_refresh_enabled:
+            self.set_interval(1.0, self.auto_refresh)
+            self.app.notify("✅ Auto-refresh włączony")
+        else:
+            self.app.notify("⏹️ Auto-refresh wyłączony")
+    
+    def manual_refresh(self):
+        """Ręczne odświeżenie"""
+        try:
+            self.reload()
+            self.app.notify("🔄 Drzewo odświeżone")
+        except Exception as e:
+            self.app.notify(f"❌ Błąd odświeżania: {e}", severity="error")
+    
+    def set_root_path(self, path: str | Path):
+        """Zmień katalog główny drzewa"""
+        new_path = Path(path)
+        if new_path.exists() and new_path.is_dir():
+            self.path = new_path
+            self.reload()
+            self.app.notify(f"📁 Katalog zmieniony na: {path}")
+        else:
+            self.app.notify(f"❌ Katalog nie istnieje: {path}", severity="error")
+    
+    def render_label(self, node, base_style, style):
+        """Custom render z wyraźnymi strzałkami"""
+        if node._allow_expand:
+            # Dodaj wyraźne strzałki
+            arrow = "▼ " if node.is_expanded else "▶ "
+            folder_icon = "📂" if node.is_expanded else "📁"
+            label = f"{arrow}{folder_icon} {node._label}"
+        else:
+            # Plik
+            label = f"📄 {node._label}"
         
-        # Znajdź ścieżkę
-        file_path = None
-        for path_str, mapped_node in self.path_to_node.items():
-            if mapped_node == node:
-                file_path = Path(path_str)
-                break
-        
-        # Wyślij event jeśli to plik
-        if file_path and file_path.is_file():
-            self.post_message(FileOpenRequest(file_path))
+        from rich.text import Text
+        return Text(label)

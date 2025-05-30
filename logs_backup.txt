@@ -1,0 +1,25 @@
+[01:11:50] ⚙️ MANAGER: 🚀 GUI uruchomione - gotowe do sterowania procesami!
+[01:11:50] ⚙️ MANAGER: Użyj przycisków 'Start All' lub wprowadź scenariusz dla agenta
+[01:12:03] ⚙️ MANAGER: Starting agent...
+[01:12:03] ⚙️ MANAGER: agent started (PID: 4888)
+[01:12:05] ⚙️ MANAGER: Starting analyser...
+[01:12:05] ⚙️ MANAGER: analyser started (PID: 3152)
+[01:12:06] 🤖 AGENT: đź§Ş agent_input.json istnieje? True
+[01:12:06] 🤖 AGENT: đź“„ ZawartoĹ›Ä‡ agent_input.json:
+[01:12:06] 🤖 AGENT: {
+[01:12:06] 🤖 AGENT: "goal": "Zainicjuj projekt Vite z React i TypeScript w katalogu 'output/app', uĹĽywajÄ…c komendy 'npm create vite@latest . -- --template react-ts' z katalogu roboczego 'output/app'. NastÄ™pnie uruchom 'npm install' i 'npm run dev -- --port 3000' z katalogu 'app'. Nie twĂłrz rÄ™cznie plikĂłw, ktĂłre powinny byÄ‡ wygenerowane przez scaffolder Vite.",
+[01:12:06] 🤖 AGENT: "constraints": [
+[01:12:06] 🤖 AGENT: "Podawaj peĹ‚ne Ĺ›cieĹĽki katalogĂłw roboczych w polu 'cwd', np. 'output/app'",
+[01:12:06] 🤖 AGENT: "Nie generuj rÄ™cznie plikĂłw typu App.tsx, index.tsx, vite.config.ts, index.html",
+[01:12:06] 🤖 AGENT: "Nie uĹĽywaj create-react-app ani react-scripts",
+[01:12:06] 🤖 AGENT: "Zainstaluj zaleĹĽnoĹ›ci przed prĂłbÄ… uruchomienia",
+[01:12:06] 🤖 AGENT: "JeĹ›li tworzysz krok scenariusza, ktĂłry bÄ™dzie uĹĽywaĹ‚ potencjalnie nowej biblioteki, to zinstaluj je do zaleĹĽnosci projektu",
+[01:12:06] 🤖 AGENT: "Projekt frontendowy ma dziaĹ‚aÄ‡ w katalogu 'output/app'"
+[01:12:06] 🤖 AGENT: ]
+[01:12:06] 🤖 AGENT: }
+[01:12:06] 🤖 AGENT: đźź˘ Podaj nowy cel dziaĹ‚ania agenta:
+[01:12:08] ⚙️ MANAGER: Starting synthetiser...
+[01:12:08] ⚙️ MANAGER: synthetiser started (PID: 9328)
+❌ [01:12:10] 🔧 SYNTHETISER: âš ď¸Ź Konflikt symbolu 'default': app\eslint.config.js.analysis.json vs app\vite.config.ts.analysis.json
+❌ [01:12:10] 🔧 SYNTHETISER: âš ď¸Ź Konflikt symbolu 'default': app\vite.config.ts.analysis.json vs app\src\App.tsx.analysis.json
+❌ [01:12:10] 🔧 SYNTHETISER: âš ď¸Ź Konflikt symbolu 'default': app\src\App.tsx.analysis.json vs app\src\components\Clock.tsx.analysis.json

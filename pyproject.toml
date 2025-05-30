@@ -27,7 +27,7 @@ agent = "agent.main:main"
 analyser = "analyser.main:main"
 analyser-watch = "analyser.run_analyser:main"
 synthetiser = "synthetiser.main:main"
-gui-dashboard = "gui.main:main"
+gui = "gui.main:main"
 
 [build-system]
 requires = ["poetry-core>=2.0.0"]

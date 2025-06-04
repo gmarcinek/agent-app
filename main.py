@@ -1,122 +1,158 @@
-import subprocess
+#!/usr/bin/env python3
+"""
+Root Main.py - Process Orchestrator
+Zarządza wszystkimi procesami używając ProcessManager z registry
+"""
+
 import os
+import sys
+import signal
 import time
 import atexit
-from registry.process_registry import process_registry
+from pathlib import Path
 
-def start_process(cmd, cwd=".", capture_output=True):
-    print(f"🔧 Uruchamiam komendę: {' '.join(cmd)}")
-    print(f"🔧 W katalogu: {os.path.abspath(cwd)}")
-    
-    if capture_output:
-        proc = subprocess.Popen(
-            cmd,
-            cwd=os.path.abspath(cwd),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            env=os.environ.copy(),
-        )
-    else:
-        # Przekazanie stdin/stdout/stderr do terminala - tryb interaktywny
-        proc = subprocess.Popen(
-            cmd,
-            cwd=os.path.abspath(cwd),
-            stdin=None,
-            stdout=None,
-            stderr=None,
-            text=True,
-            env=os.environ.copy(),
-        )
-    process_registry.register(proc)
-    print(f"🚀 Uruchomiono proces `{' '.join(cmd)}` (PID {proc.pid})")
-    return proc
+# Ustaw encoding przed importami
+os.environ['PYTHONIOENCODING'] = 'utf-8'
+os.environ['PYTHONUTF8'] = '1'
 
-def cleanup():
-    print("\n🧹 Sprzątanie procesów...")
-    process_registry.kill_all()
+# Upewnij się że katalog output istnieje
+os.makedirs("output", exist_ok=True)
 
-atexit.register(cleanup)
+from registry.process_manager import ProcessManager
+from logger import get_log_hub
 
-def main():
-    print("🚀 Uruchamiam główną aplikację...")
-    
-    # Sprawdź czy poetry działa
-    try:
-        result = subprocess.run(["poetry", "--version"], capture_output=True, text=True)
-        print(f"🔧 Poetry: {result.stdout.strip()}")
-    except Exception as e:
-        print(f"❌ Błąd poetry: {e}")
-        return
+# Globalne instancje
+process_manager = None
+log_hub = None
+shutdown_initiated = False
 
-    # Komendy dla wszystkich procesów
-    analyser_cmd = ["poetry", "run", "analyser-watch", "--mode", "watch"]
-    synthetiser_cmd = ["poetry", "run", "synthetiser", "--mode", "watch"]
-    agent_cmd = ["poetry", "run", "agent"]
+def setup_logging():
+    """Konfiguruje system logowania"""
+    global log_hub
+    log_hub = get_log_hub()
+    
+    def console_listener(entry):
+        formatted = log_hub.format_entry(entry)
+        print(formatted)
+    
+    log_hub.add_listener(console_listener)
+    return log_hub
 
-    print("🔧 Uruchamiam agent...")
-    # agent uruchamiamy w trybie interaktywnym - dziedziczy terminal (stdin/out/err)
-    agent_process = start_process(agent_cmd, capture_output=False)
+def signal_handler(signum, frame):
+    """Handler dla sygnałów SIGINT/SIGTERM"""
+    global shutdown_initiated
     
-    print("🔧 Czekam 2 sekundy przed uruchomieniem analysera...")
-    time.sleep(2)
+    if shutdown_initiated:
+        log_hub.warn("MAIN", "Force shutdown requested - emergency stop")
+        process_manager.emergency_stop_all()
+        sys.exit(1)
     
-    print("🔧 Uruchamiam analyser...")
-    # analyser uruchamiamy bez przekierowania - będzie logował do konsoli
-    analyser_process = start_process(analyser_cmd, capture_output=False)
+    shutdown_initiated = True
+    signal_name = "SIGINT" if signum == signal.SIGINT else f"Signal {signum}"
+    log_hub.info("MAIN", f"🛑 {signal_name} received - initiating graceful shutdown...")
     
-    print("🔧 Czekam 3 sekundy przed uruchomieniem synthetiser...")
-    time.sleep(3)
-    
-    print("🔧 Uruchamiam synthetiser...")
-    # synthetiser uruchamiamy bez przekierowania - będzie logował do konsoli
-    synthetiser_process = start_process(synthetiser_cmd, capture_output=False)
+    graceful_shutdown()
+    sys.exit(0)
 
-    # Sprawdź natychmiast czy procesy żyją
-    print("🔧 Sprawdzanie statusu procesów po uruchomieniu...")
-    time.sleep(1)
-    
-    processes = {
-        "Agent": agent_process,
-        "Analyser": analyser_process,
-        "Synthetiser": synthetiser_process
-    }
-    
-    for name, proc in processes.items():
-        if proc.poll() is not None:
-            print(f"❌ {name} już nie żyje! Kod wyjścia: {proc.returncode}")
-        else:
-            print(f"✅ {name} działa")
+def graceful_shutdown():
+    """Graceful shutdown wszystkich procesów"""
+    if process_manager:
+        log_hub.info("MAIN", "🧹 Stopping all processes...")
+        process_manager.stop_all()
+        log_hub.info("MAIN", "✅ Shutdown complete")
 
-    # Flagi dla jednorazowego wyświetlania statusu
-    process_done_flags = {name: False for name in processes.keys()}
+def emergency_cleanup():
+    """Emergency cleanup przy wyjściu z programu"""
+    if process_manager and not shutdown_initiated:
+        log_hub.warn("MAIN", "⚠️ Emergency cleanup on exit")
+        process_manager.emergency_stop_all()
+
+def wait_for_processes():
+    """Oczekuje na zakończenie procesów lub przerwanie przez użytkownika"""
+    log_hub.info("MAIN", "🔄 System running. Press Ctrl+C to stop gracefully, Ctrl+C twice for emergency stop")
     
     try:
         while True:
-            # Sprawdź status wszystkich procesów
-            all_done = True
-            for name, proc in processes.items():
-                is_done = proc.poll() is not None
-                
-                if is_done and not process_done_flags[name]:
-                    print(f"🛑 {name} zakończył działanie z kodem: {proc.returncode}")
-                    process_done_flags[name] = True
-                
-                if not is_done:
-                    all_done = False
+            # Sprawdź status procesów co 5 sekund
+            running = process_manager.get_running_processes()
             
-            # Jeśli wszystkie procesy zakończone
-            if all_done:
-                print("🛑 Wszystkie procesy zakończyły działanie.")
+            if not running:
+                log_hub.info("MAIN", "📭 All processes finished - shutting down")
                 break
-
-            time.sleep(0.5)
-
+                
+            time.sleep(5)
+            
     except KeyboardInterrupt:
-        print("\n⏹️ Przerwano działanie aplikacji przez użytkownika.")
+        # To zostanie przechwycone przez signal_handler
+        pass
 
-    finally:
-        cleanup()
+def start_default_processes():
+    """Uruchamia domyślne procesy systemu"""
+    log_hub.info("MAIN", "🚀 Starting default processes...")
+    
+    # Lista procesów do uruchomienia
+    default_processes = [
+        ("agent", ["poetry", "run", "agent"]),
+        ("analyser", ["poetry", "run", "analyser-watch", "--mode", "watch"]),
+        ("synthetiser", ["poetry", "run", "synthetiser", "--mode", "watch"])
+    ]
+    
+    success_count = 0
+    for name, cmd in default_processes:
+        log_hub.info("MAIN", f"🔧 Starting {name}...")
+        if process_manager.start_poetry_process(name, cmd, "."):
+            success_count += 1
+            log_hub.info("MAIN", f"✅ {name} started successfully")
+            # Krótka przerwa między procesami
+            time.sleep(2)
+        else:
+            log_hub.error("MAIN", f"❌ Failed to start {name}")
+    
+    log_hub.info("MAIN", f"📊 Started {success_count}/{len(default_processes)} processes")
+    return success_count > 0
+
+def main():
+    """Główna funkcja orchestratora"""
+    global process_manager
+    
+    # Setup
+    log_hub = setup_logging()
+    log_hub.info("MAIN", "🎯 Starting Process Orchestrator")
+    
+    # Zarejestruj signal handlers
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
+    # Zarejestruj emergency cleanup
+    atexit.register(emergency_cleanup)
+    
+    try:
+        # Inicjalizuj ProcessManager (singleton)
+        process_manager = ProcessManager()
+        log_hub.info("MAIN", "🏗️ ProcessManager initialized")
+        
+        # Uruchom domyślne procesy
+        if not start_default_processes():
+            log_hub.error("MAIN", "❌ Failed to start any processes - exiting")
+            return 1
+        
+        # Pokaż status
+        status = process_manager.get_system_status()
+        log_hub.info("MAIN", f"📈 System status: {status['active_processes']}/{status['total_processes']} processes active")
+        
+        # Oczekuj na zakończenie lub przerwanie
+        wait_for_processes()
+        
+        # Graceful shutdown
+        graceful_shutdown()
+        return 0
+        
+    except Exception as e:
+        log_hub.error("MAIN", f"💥 Fatal error: {e}")
+        if process_manager:
+            process_manager.emergency_stop_all()
+        return 1
 
 if __name__ == "__main__":
-    main()
+    exit_code = main()
+    sys.exit(exit_code)

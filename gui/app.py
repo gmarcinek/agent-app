@@ -13,11 +13,14 @@ from gui.widgets.tab_manager import TabManager
 from gui.events import FileOpenRequest
 
 # Import nowych widgetów
-from gui.process_manager import ProcessManager
+from registry.process_manager import ProcessManager
 from gui.widgets.logs_section import LogsSection
 from gui.widgets.prompt_section import ScenarioPromptSection
 from gui.widgets.process_footer import ProcessFooter
 from gui.widgets.main_content_panel import MainContentPanel
+
+# Import GlobalLogHub
+from logger import get_log_hub
 
 class FolderContentView(Static):
     """Placeholder dla folder content - może zostać rozwinięte później"""
@@ -33,7 +36,7 @@ class AgentDashboard(App):
     }
     
     #editor-section {
-        height: 4fr;
+        height: 5fr;
         min-height: 10;
         width: 100%;
         margin: 0;
@@ -78,6 +81,7 @@ class AgentDashboard(App):
     def __init__(self):
         super().__init__()
         self.process_manager = ProcessManager()
+        self.log_hub = get_log_hub()
         
         # Cleanup przy zamykaniu
         atexit.register(self.cleanup)
@@ -110,18 +114,18 @@ class AgentDashboard(App):
     
     def on_scenario_prompt_section_prompt_submitted(self, event) -> None:
         """Obsługuje wysłanie promptu do interactive loop"""
-        # Tutaj możesz dodać dodatkową logikę po wysłaniu promptu
-        self.process_manager._emit_log("manager", f"Prompt wysłany do agenta: {event.prompt}")
+        # Używaj GlobalLogHub zamiast process_manager
+        self.log_hub.info("GUI", f"Prompt wysłany do agenta: {event.prompt}")
 
     def on_mount(self) -> None:
         """Inicjalizacja po uruchomieniu"""
         self.theme = "gruvbox"
         
-        # Powitanie w logach
-        self.process_manager._emit_log("manager", "🚀 GUI uruchomione - gotowe do sterowania procesami!")
+        # Powitanie w logach - używaj GlobalLogHub
+        self.log_hub.info("GUI", "🚀 GUI uruchomione - gotowe do sterowania procesami!")
         
         # Automatyczne uruchomienie wszystkich procesów
-        self.process_manager._emit_log("manager", "🔄 Automatyczne uruchamianie procesów...")
+        self.log_hub.info("GUI", "🔄 Automatyczne uruchamianie procesów...")
         self.set_timer(1.0, lambda: self.process_manager.start_all())
 
     def cleanup(self):

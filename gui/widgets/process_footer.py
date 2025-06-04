@@ -4,7 +4,7 @@ Minimalny footer z mikroskopijnymi kontrolkami
 from textual.widgets import Footer
 from textual.binding import Binding
 
-from gui.process_manager import ProcessManager
+from registry.process_manager import ProcessManager
 
 class ProcessFooter(Footer):
     """Mikroskopijny footer z statusami procesów i kontrolkami"""

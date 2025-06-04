@@ -1,8 +1,9 @@
 import re
+import ast
 from typing import Dict, List
 
 def parse_code_file(content: str, language: str) -> Dict:
-    """Regex-based parser for frontend languages"""
+    """Parser kodu źródłowego – AST dla Pythona, regex dla frontendów"""
     
     if language in ['js', 'jsx', 'ts', 'tsx', 'javascript', 'typescript']:
         return parse_js_ts_regex(content, language)
@@ -12,6 +13,8 @@ def parse_code_file(content: str, language: str) -> Dict:
         return {'imports': [], 'exports': [], 'type': 'stylesheet'}
     elif language == 'json':
         return {'imports': [], 'exports': [], 'type': 'config'}
+    elif language == 'python' or language == 'py':
+        return parse_python_ast(content)
     else:
         return {'imports': [], 'exports': [], 'type': 'unknown'}
 
@@ -23,7 +26,7 @@ def parse_js_ts_regex(content: str, language: str) -> Dict:
     # Parse imports
     import_patterns = [
         r'import\s+.*?\s+from\s+[\'"]([^\'"]+)[\'"]',  # import ... from 'module'
-        r'import\s+[\'"]([^\'"]+)[\'"]',                # import 'module'
+        r'import\s+[\'"]([^\'"]+)[\'"]',               # import 'module'
         r'require\([\'"]([^\'"]+)[\'"]\)',             # require('module')
     ]
     
@@ -57,4 +60,32 @@ def parse_js_ts_regex(content: str, language: str) -> Dict:
         'imports': list(set(imports)),  # Remove duplicates
         'exports': list(set(exports)),
         'type': file_type
+    }
+
+def parse_python_ast(content: str) -> Dict:
+    """Analiza AST dla plików Python – wyciąga importy"""
+    imports = []
+    exports = []
+    try:
+        tree = ast.parse(content)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    imports.append(alias.name)
+            elif isinstance(node, ast.ImportFrom):
+                if node.module:
+                    imports.append(node.module)
+        # Eksportowane klasy/funkcje:
+        for node in tree.body:
+            if isinstance(node, ast.FunctionDef) or isinstance(node, ast.AsyncFunctionDef):
+                exports.append(node.name)
+            elif isinstance(node, ast.ClassDef):
+                exports.append(node.name)
+    except SyntaxError:
+        pass
+
+    return {
+        'imports': list(set(imports)),
+        'exports': list(set(exports)),
+        'type': 'module'
     }

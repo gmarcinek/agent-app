@@ -1,7 +1,11 @@
 import subprocess
 import os
+from logger import get_log_hub
 
 class ScriptRunner:
+    def __init__(self):
+        self.log_hub = get_log_hub()
+
     def run(self, command: str, cwd: str = ".", timeout: int = 30) -> dict:
         """
         Uniwersalne uruchamianie komend systemowych w zadanym katalogu roboczym.
@@ -10,6 +14,7 @@ class ScriptRunner:
         exec_path = os.path.abspath(cwd or ".")
 
         if not os.path.isdir(exec_path):
+            self.log_hub.error("AGENT", f"Katalog roboczy nie istnieje: {exec_path}")
             return {
                 "ok": False,
                 "stdout": "",
@@ -17,7 +22,7 @@ class ScriptRunner:
                 "exit_code": -1
             }
 
-        print(f"🛠️  Uruchamiam komendę: `{command}` (cwd={exec_path})")
+        self.log_hub.info("AGENT", f"Uruchamiam komendę: `{command}` (cwd={exec_path})")
 
         try:
             result = subprocess.run(
@@ -28,6 +33,10 @@ class ScriptRunner:
                 cwd=exec_path,
                 timeout=timeout
             )
+            
+            if result.returncode != 0:
+                self.log_hub.error("AGENT", f"Komenda '{command}' zakończona z kodem {result.returncode}: {result.stderr}")
+            
             return {
                 "ok": result.returncode == 0,
                 "stdout": result.stdout.strip(),
@@ -36,6 +45,7 @@ class ScriptRunner:
             }
 
         except subprocess.TimeoutExpired:
+            self.log_hub.error("AGENT", f"Timeout wykonania komendy '{command}' (>{timeout}s)")
             return {
                 "ok": False,
                 "stdout": "",
@@ -44,6 +54,7 @@ class ScriptRunner:
             }
 
         except Exception as e:
+            self.log_hub.error("AGENT", f"Błąd uruchamiania komendy '{command}': {e}")
             return {
                 "ok": False,
                 "stdout": "",

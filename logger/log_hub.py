@@ -46,6 +46,7 @@ class GlobalLogHub:
         self.register_module("AGENT", "🤖", "green") 
         self.register_module("SYNTHETISER", "🔧", "yellow")
         self.register_module("GUI", "🖥️", "purple")
+        self.register_module("FILESYSTEM", "📁", "white")
     
     @classmethod
     def get_instance(cls) -> 'GlobalLogHub':
@@ -98,7 +99,7 @@ class GlobalLogHub:
             
         # Sprawdź czy moduł jest zarejestrowany
         if module not in self.modules:
-            self.register_module(module, "❓", "gray")
+            self.register_module(module, "***", "gray")
         
         module_config = self.modules[module]
         if not module_config.enabled:

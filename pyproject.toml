@@ -6,7 +6,9 @@ authors = ["gmarcinek <grzegorz.marcinek@gmail.com>"]
 packages = [
     { include = "agent" },
     { include = "analyser" },
-    { include = "synthetiser" }
+    { include = "synthetiser" },
+    { include = "registry" },
+    { include = "logger" }
 ]
 
 [tool.poetry.dependencies]
@@ -17,13 +19,19 @@ python-dotenv = ">=1.1.0,<2.0.0"
 watchdog = "^4.0.0"
 textual = {extras = ["syntax"], version = "^3.2.0"}
 psutil = "^7.0.0"
+pyperclip = "^1.9.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"
 flake8 = "^7.2.0"
 
 [tool.poetry.scripts]
-app = "main:main"
+# Main orchestrator - nowy główny entry point
+main = "main:main"
+orchestrator = "main:main"
+
+# Existing scripts
+app = "gui.main:main"
 agent = "agent.main:main"
 analyser = "analyser.main:main"
 analyser-watch = "analyser.run_analyser:main"

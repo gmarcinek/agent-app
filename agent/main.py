@@ -6,7 +6,6 @@ os.environ['PYTHONIOENCODING'] = 'utf-8'
 
 import json
 import atexit
-import signal
 
 # ⬇️ Upewniamy się, że katalog output istnieje
 os.makedirs("output", exist_ok=True)
@@ -56,15 +55,6 @@ def describe_step(step: dict) -> tuple[str, str]:
         path = "?"
 
     return name, path
-
-def cleanup_background_processes():
-    log_hub.info("AGENT", "Sprzątanie... Zatrzymuję procesy w tle")
-    process_manager.stop_all()
-
-# Rejestruj cleanup przy wyjściu
-atexit.register(cleanup_background_processes)
-signal.signal(signal.SIGINT, lambda sig, frame: exit(0))
-signal.signal(signal.SIGTERM, lambda sig, frame: exit(0))
 
 def main():
     log_hub.debug("AGENT", f"agent_input.json istnieje: {os.path.exists('agent_input.json')}")

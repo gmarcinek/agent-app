@@ -99,7 +99,7 @@ class GlobalLogHub:
             
         # Sprawdź czy moduł jest zarejestrowany
         if module not in self.modules:
-            self.register_module(module, "❓", "gray")
+            self.register_module(module, "***", "gray")
         
         module_config = self.modules[module]
         if not module_config.enabled:

@@ -1,11 +1,14 @@
 {
-  "goal": "Zainicjuj projekt Vite z React i TypeScript w katalogu 'output/app', używając komendy 'npm create vite@latest . -- --template react-ts' z katalogu roboczego 'output/app'. Następnie uruchom 'npm install' i 'npm run dev -- --port 3000' z katalogu 'app'. Nie twórz ręcznie plików, które powinny być wygenerowane przez scaffolder Vite.",
+  "goal": "Zainicjuj projekt Vite z React i TypeScript w katalogu 'output/app', używając komendy 'npm create vite@latest . -- --template react-ts' z katalogu roboczego 'output/app'. Następnie uruchom 'npm install' i 'npm run dev -- --port 3000' z katalogu 'app'. Nie twórz ręcznie plików, które powinny być wygenerowane przez scaffolder Vite. Aplikacja ma zawierać książkę kucharską o kuchni włoskiej i 7 podstron z przepisami. Każdy przepis to jeden komponent. Zacznij od listy a potem sukcesywnie generuj każdy przepis komponent z osobna. Strona główna to piękny widok z listą przepisów po lewej oraz przepisem po prawej. Oparte na routerze. Lista cały czas widoczna po lewej a kontener po prawej pokazuje przepis wybrany. Ustaw display flex dla obu sekcji. Dodaj header i footer. Przepisy powinny być po polsku. Użyj emotikonek do ingredientów żeby lepiej sie czytało. Wybolduj ważne rzeczy. Widok przepisu składa się z Nagłówka wielkość h1, listy składników, opisu, zdjęcia z efektem oczekiwanym, wybierz takie rzeczy z internetu lub wstaw placeholder",
   "constraints": [
     "Podawaj pełne ścieżki katalogów roboczych w polu 'cwd', np. 'output/app'",
     "Nie generuj ręcznie plików typu App.tsx, index.tsx, vite.config.ts, index.html",
     "Nie używaj create-react-app ani react-scripts",
     "Zainstaluj zależności przed próbą uruchomienia",
     "Jeśli tworzysz krok scenariusza, który będzie używał potencjalnie nowej biblioteki, to zinstaluj je do zależnosci projektu",
-    "Projekt frontendowy ma działać w katalogu 'output/app'"
+    "Projekt frontendowy ma działać w katalogu 'output/app'",
+    "Scenariusz musi zawierać WSZYSTKIE kroki do kompletnej realizacji celu - nie skracaj!",
+    "Jeśli cel wymieniona konkretną liczbę elementów (np. 20 przepisów), wygeneruj wszystkie",
+    "Pamiętaj o modyfikacji głównych plików aplikacji (App.tsx) żeby używały nowych komponentów"
   ]
 }

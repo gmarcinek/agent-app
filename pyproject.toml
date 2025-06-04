@@ -6,7 +6,9 @@ authors = ["gmarcinek <grzegorz.marcinek@gmail.com>"]
 packages = [
     { include = "agent" },
     { include = "analyser" },
-    { include = "synthetiser" }
+    { include = "synthetiser" },
+    { include = "registry" },
+    { include = "logger" }
 ]
 
 [tool.poetry.dependencies]
@@ -24,6 +26,11 @@ pytest = "^8.3.5"
 flake8 = "^7.2.0"
 
 [tool.poetry.scripts]
+# Main orchestrator - nowy główny entry point
+main = "main:main"
+orchestrator = "main:main"
+
+# Existing scripts
 app = "gui.main:main"
 agent = "agent.main:main"
 analyser = "analyser.main:main"

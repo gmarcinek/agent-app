@@ -7,6 +7,8 @@ import threading
 import time
 from pathlib import Path
 from typing import Dict, List, Optional
+import os
+import psutil
 
 # Import systemu logowania i cleanera
 from logger import get_log_hub, LogLevel
@@ -15,17 +17,26 @@ from registry.process_cleaner import ProcessCleaner, quick_cleanup
 
 class ProcessManager:
     """Lean Process Manager - tylko zarządzanie procesami, cleanup delegowany"""
-    
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super(ProcessManager, cls).__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
     def __init__(self):
+        if self._initialized:
+            return
+        self._initialized = True
+
         self.processes: Dict[str, subprocess.Popen] = {}
         self.process_threads: Dict[str, threading.Thread] = {}
         self.running = False
-        
-        # Inicjalizuj komponenty
+
         self.log_hub = get_log_hub()
         self.cleaner = ProcessCleaner(self.log_hub)
-        
-        # Centralna konfiguracja poetry komend
+
         self.poetry_commands = {
             "agent": ["poetry", "run", "agent"],
             "analyser": ["poetry", "run", "analyser-watch", "--mode", "watch"],
@@ -293,55 +304,70 @@ class ProcessManager:
             "processes": {name: self.get_process_info(name) for name in self.processes.keys()}
         }
     
-    def start_custom_process(self, name: str, cmd: List[str], 
-                            working_dir: str = ".", 
-                            detached: bool = False,
-                            shell: bool = False,
-                            creation_flags: int = 0,
-                            preexec_fn=None) -> bool:
+    def start_custom_process(
+        self,
+        name: str,
+        cmd: List[str],
+        working_dir: str = ".",
+        detached: bool = False,
+        shell: bool = False,
+        creation_flags: int = 0,
+        preexec_fn=None
+    ) -> bool:
         """
-        Uruchamia dowolny proces (nie tylko poetry)
-        
+        Uruchamia dowolny proces (np. dev server) i rejestruje jego potomne procesy.
+
         Args:
             name: Nazwa procesu do rejestracji
             cmd: Lista komend lub string jeśli shell=True
             working_dir: Katalog roboczy
-            detached: True dla procesów w tle (dev serwery) - bez czytania output
-            shell: Czy uruchamiać przez shell
-            creation_flags: Windows creation flags
-            preexec_fn: Unix preexec function
+            detached: Czy uruchamiać jako proces w tle (bez logów)
+            shell: Czy używać shella
+            creation_flags: np. CREATE_NEW_PROCESS_GROUP dla Windows
+            preexec_fn: np. os.setsid dla Linux/Mac
         """
         if name in self.processes:
             self.log_hub.warn("MANAGER", f"Process {name} already running")
             return False
-        
+
         try:
             self.log_hub.info("MANAGER", f"Starting custom process {name}...")
-            
+
             if working_dir:
-                self.log_hub.debug("MANAGER", f"Starting {name} in directory: {working_dir}")
-            
-            # Konfiguracja dla detached procesów (dev serwery)
+                self.log_hub.debug("MANAGER", f"Working directory: {working_dir}")
+
             if detached:
-                stdout = subprocess.DEVNULL
-                stderr = subprocess.DEVNULL
+                stdout = subprocess.PIPE
+                stderr = subprocess.STDOUT
                 stdin = subprocess.DEVNULL
-                start_new_session = True
+                start_new_session = False  # <- kluczowe
+                bufsize = 1
+                text = True
+                encoding = "utf-8"
+                errors = "replace"
             else:
-                # Standardowa konfiguracja z output reading
                 stdout = subprocess.PIPE
                 stderr = subprocess.STDOUT
                 stdin = subprocess.PIPE
                 start_new_session = False
-            
-            # Uruchom proces
+                bufsize = 1
+                text = True
+                encoding = "utf-8"
+                errors = "replace"
+
+            env = {
+                "PYTHONIOENCODING": "utf-8",
+                "PYTHONUTF8": "1",
+                **os.environ
+            }
+
             process = subprocess.Popen(
                 cmd,
                 cwd=working_dir,
                 stdout=stdout,
                 stderr=stderr,
                 stdin=stdin,
-                text=True,
+                text=not detached,
                 shell=shell,
                 start_new_session=start_new_session,
                 creationflags=creation_flags,
@@ -349,14 +375,24 @@ class ProcessManager:
                 bufsize=1 if not detached else 0,
                 encoding='utf-8' if not detached else None,
                 errors='replace' if not detached else None,
-                env={"PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1", **dict(__import__('os').environ)}
+                env=env
             )
-            
+
             self.processes[name] = process
-            self.log_hub.info("MANAGER", f"{name} started (PID: {process.pid})" + 
-                                (f" in {working_dir}" if working_dir else ""))
-            
-            # Uruchom wątek do czytania output tylko dla nie-detached procesów
+            self.log_hub.info("MANAGER", f"{name} started (PID: {process.pid})")
+
+            # Rejestruj dzieci (jeśli detached – np. dev-server spawnuje node itp.)
+            try:
+                proc = psutil.Process(process.pid)
+                children = proc.children(recursive=True)
+                for child in children:
+                    child_key = f"{name}_child_{child.pid}"
+                    self.processes[child_key] = child
+                    self.log_hub.debug("MANAGER", f"Registered child process: {child_key}")
+            except Exception as e:
+                self.log_hub.warn("MANAGER", f"Failed to inspect child processes: {e}")
+
+            # Czytaj output tylko jeśli nie jest detached
             if not detached:
                 thread = threading.Thread(
                     target=self._read_process_output,
@@ -365,9 +401,9 @@ class ProcessManager:
                 )
                 thread.start()
                 self.process_threads[name] = thread
-            
+
             return True
-            
+
         except Exception as e:
             self.log_hub.error("MANAGER", f"Failed to start custom process {name}: {e}")
             return False

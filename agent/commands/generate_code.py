@@ -12,7 +12,7 @@ class GenerateCodeCommand(Command):
         artifact = self.params["params"]["artifact"]
 
         artifact_name = artifact["name"]
-        filepath = artifact["path"]
+        filepath = artifact["path"]  # Mamy już path!
         extension = artifact.get("extension", "")
         context_mode = self.params.get("context_mode", "meta_only")
 
@@ -32,6 +32,7 @@ class GenerateCodeCommand(Command):
         prompt = build_prompt(
             prompt_text=prompt_text,
             artifact_name=artifact_name,
+            artifact_path=filepath,  # ← DODAJ PATH
             context_mode=context_mode
         )
 

@@ -22,8 +22,18 @@ class CleanupReport(NamedTuple):
 
 class ProcessCleaner:
     """Dedykowany cleaner do zamykania procesów i threadów"""
-    
+    _instance = None
+
+    def __new__(cls, log_hub=None):
+        if cls._instance is None:
+            cls._instance = super(ProcessCleaner, cls).__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
     def __init__(self, log_hub=None):
+        if self._initialized:
+            return
+        self._initialized = True
         self.log_hub = log_hub
     
     def cleanup_all(self, 

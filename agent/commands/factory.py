@@ -4,10 +4,13 @@ from .run_script import RunScriptCommand
 from .make_directory import MakeDirectoryCommand
 from .change_directory import ChangeDirectoryCommand
 from .delete import DeleteCommand
+from .patch_file import PatchFileCommand
 
 def get_command(command_type: str, step: dict):
     if command_type == "generate_code":
         return GenerateCodeCommand(step)
+    elif command_type == "patch_file":
+        return PatchFileCommand(step)
     elif command_type == "write_file":
         return WriteFileCommand(step)
     elif command_type == "run_script":

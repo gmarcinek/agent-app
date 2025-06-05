@@ -9,11 +9,11 @@ from pathlib import Path
 from typing import Dict, List, Optional
 import os
 import psutil
+import socket
 
 # Import systemu logowania i cleanera
 from logger import get_log_hub, LogLevel
 from registry.process_cleaner import ProcessCleaner, quick_cleanup
-
 
 class ProcessManager:
     """Lean Process Manager - tylko zarządzanie procesami, cleanup delegowany"""
@@ -164,39 +164,6 @@ class ProcessManager:
         
         self.log_hub.group_end("MANAGER", f"Started {success_count}/{len(self.poetry_commands)} processes")
     
-    def stop_process(self, name: str) -> bool:
-        """Zatrzymuje pojedynczy proces używając cleanera"""
-        if name not in self.processes:
-            self.log_hub.warn("MANAGER", f"Process {name} not running")
-            return False
-        
-        try:
-            self.log_hub.info("MANAGER", f"Stopping {name}...")
-            
-            # Użyj cleaner do graceful shutdown
-            process = self.processes[name]
-            success = self.cleaner.cleanup_single_process(name, process)
-            
-            if success:
-                # Usuń z rejestrów po udanym zamknięciu
-                if name in self.processes:
-                    del self.processes[name]
-                if name in self.process_threads:
-                    # Thread powinien się zakończyć automatycznie po zamknięciu procesu
-                    thread = self.process_threads[name]
-                    thread.join(timeout=2)  # Krótki timeout
-                    del self.process_threads[name]
-                
-                self.log_hub.info("MANAGER", f"{name} stopped successfully")
-                return True
-            else:
-                self.log_hub.error("MANAGER", f"Failed to stop {name}")
-                return False
-            
-        except Exception as e:
-            self.log_hub.error("MANAGER", f"Error stopping {name}: {e}")
-            return False
-    
     def stop_all(self) -> None:
         """Zatrzymuje wszystkie procesy używając ProcessCleaner"""
         if not self.running:
@@ -226,19 +193,6 @@ class ProcessManager:
             pids_str = ', '.join(str(pid) for pid in cleanup_report.zombie_pids)
             self.log_hub.warn("MANAGER", f"Manual cleanup needed for PIDs: {pids_str}")
     
-    def restart_process(self, name: str) -> bool:
-        """Restartuje konkretny proces"""
-        self.log_hub.info("MANAGER", f"Restarting {name}...")
-        
-        if name not in self.poetry_commands:
-            self.log_hub.error("MANAGER", f"Unknown process: {name}")
-            return False
-        
-        # Stop and start
-        self.stop_process(name)
-        time.sleep(1)  # Krótka przerwa
-        return self.start_poetry_process(name, self.poetry_commands[name], ".")
-    
     def emergency_stop_all(self) -> None:
         """Emergency stop wszystkich procesów - bez graceful shutdown"""
         self.log_hub.warn("MANAGER", "EMERGENCY STOP INITIATED")
@@ -264,18 +218,6 @@ class ProcessManager:
         """Sprawdza czy proces jest uruchomiony"""
         return name in self.processes and self.processes[name].poll() is None
     
-    def get_status(self) -> Dict[str, str]:
-        """Zwraca status wszystkich procesów dla ProcessFooter"""
-        status = {}
-        
-        for process_name in self.poetry_commands.keys():
-            if self.is_running(process_name):
-                status[process_name] = "running"
-            else:
-                status[process_name] = "stopped"
-        
-        return status
-    
     def get_process_info(self, name: str) -> Optional[Dict]:
         """Zwraca szczegółowe info o procesie"""
         if name not in self.processes:
@@ -292,6 +234,34 @@ class ProcessManager:
             "thread_alive": thread.is_alive() if thread else False,
             "command": self.poetry_commands.get(name, [])
         }
+    
+    @property
+    def is_dev_server_running(self) -> bool:
+        """Sprawdza czy jakikolwiek dev server jest uruchomiony"""
+        # Sprawdź zarejestrowane dev serwery
+        dev_servers = [name for name in self.processes.keys() 
+                    if name.startswith("dev_server_")]
+        
+        for server_name in dev_servers:
+            if self.is_running(server_name):
+                return True
+        
+        # Dodatkowe sprawdzenie popularnych portów dev serverów
+        common_dev_ports = [3000, 5173, 8080, 4000, 3001, 8000]
+        for port in common_dev_ports:
+            if self._is_port_occupied(port):
+                return True
+        
+        return False
+
+    def _is_port_occupied(self, port: int) -> bool:
+        """Sprawdza czy port jest zajęty"""
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(1)
+                return s.connect_ex(('localhost', port)) == 0
+        except:
+            return False
     
     def get_system_status(self) -> Dict:
         """Zwraca pełny status systemu"""

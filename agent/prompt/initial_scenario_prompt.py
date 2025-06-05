@@ -1,52 +1,32 @@
 import json
 import os
 from agent.filesystem import FileSystem, get_flat_file_list_string
-from registry.process_manager import ProcessManager
 
+def build_initial_scenario_prompt(goal: str, constraints: list[str], mode: str = "initial", registry=None) -> str:
+   """
+   Buduje prompt do generowania scenariusza w trybie inicjalnym lub interaktywnym,
+   z uwzględnieniem struktury plików i stanu dev servera.
+   """
+   constraints_txt = "\n".join(f"- {c}" for c in constraints) if constraints else "- Brak dodatkowych ograniczeń"
 
-def build_scenario_prompt(goal: str, constraints: list[str], mode: str = "initial", intention: str = "mixed") -> str:
-    """
-    Buduje prompt do generowania scenariusza w trybie inicjalnym lub interaktywnym,
-    z uwzględnieniem struktury plików i stanu dev servera.
-    """
-    process_manager = ProcessManager()
-    constraints_txt = "\n".join(f"- {c}" for c in constraints) if constraints else "- Brak dodatkowych ograniczeń"
+   fs = FileSystem(base_path="output")
+   file_structure = fs.get_flat_file_list_string()
 
-    fs = FileSystem(base_path="output")
-    file_structure = fs.get_flat_file_list_string()
+   # Wczytaj historię poprzednich kroków
+   previous_steps = load_previous_steps()
+   previous_steps_txt = format_previous_steps(previous_steps) if previous_steps else "Brak poprzednich kroków."
 
-    # Wczytaj historię poprzednich kroków
-    previous_steps = load_previous_steps()
-    previous_steps_txt = format_previous_steps(previous_steps) if previous_steps else "Brak poprzednich kroków."
-
-    # Context building based on intention
-    if intention == "infrastructure":
-        existing_context = "Kontekst pominięty - zadanie infrastrukturalne."
-    else:
-        existing_context = build_project_context(goal)
-
-    # Sprawdź stan dev servera
-    dev_server_status = ""
-    if process_manager.is_dev_server_running:
-        dev_server_status = "\n UWAGA: Dev server już działa - NIE dodawaj kroków uruchamiania dev servera!"
-    else:
-        dev_server_status = "\n Dev server nie działa - możesz go uruchomić na końcu scenariusza."
-            
-    # Dodatkowe instrukcje w zależności od trybu
-    mode_instructions = ""
-    if mode == "initial":
-        mode_instructions = """
+   # Dodatkowe instrukcje w zależności od trybu
+   mode_instructions = ""
+   if mode == "initial":
+       mode_instructions = """
 KRYTYCZNE WYMAGANIA:
 - Scenariusz musi być KOMPLETNY i zawierać WSZYSTKIE kroki do pełnej realizacji celu
-- Jeśli cel wymienia konkretną liczbę elementów (np. 20), wygeneruj WSZYSTKIE
-- NIE skracaj, NIE pomijaj elementów - wyczerpuj całe zadanie!
-- Pamiętaj o modyfikacji głównych plików aplikacji (App.tsx) żeby używały nowych komponentów  
-- Jeśli potrzebujesz routingu, zainstaluj react-router-dom
 """
-    elif mode == "interactive":
-        mode_instructions = "\n\nTryb interaktywny: Zwróć tylko **nowe** kroki — nie powielaj już wykonanych ani nie zmieniaj istniejących."
+   elif mode == "interactive":
+       mode_instructions = "\n\nTryb interaktywny: Zwróć tylko **nowe** kroki — nie powielaj już wykonanych ani nie zmieniaj istniejących."
 
-    prompt = f"""
+   prompt = f"""
 Jesteś agentem planującym działania kodującego agenta AI.
 
 Masz za zadanie **KOMPLETNIE ZREALIZOWAĆ** cel: **{goal}**
@@ -57,9 +37,6 @@ UWZGLĘDNIJ PONIŻSZE OGRANICZENIA:
 
 STRUKTURA PLIKÓW PROJEKTU:
 {file_structure}
-
-ISTNIEJĄCE KOMPONENTY I ICH FUNKCJONALNOŚĆ:
-{existing_context}
 
 OSTATNIO WYKONANE KROKI - START
 {previous_steps_txt}
@@ -78,10 +55,8 @@ DOSTĘPNE TYPY KROKÓW:
    "cwd": "output/app",      // zawsze działaj w obrębie cwd output lub głębiej
    "dev_server_mode": true | false
  }}
-- "mkdir": {{ "path": "src/components" }}
-- "delete": {{ "path": "output/obsolete.txt" }}
 - "generate_code": {{
-   "prompt": "bardzo dokładne i szczegółowe polecenie dla LLM co wygenerować, które uwzglęnia inne komponenty ze scenariusza oraz to co już istnieje, albo ma dopiero być budowane",
+   "prompt": "bardzo dokładne i szczegółowe polecenie dla LLM co wygenerować",
    "artifact": {{
      "name": "nazwa pliku",
      "path": "output/app/src/components/Foo.tsx",
@@ -89,37 +64,19 @@ DOSTĘPNE TYPY KROKÓW:
    }}
  }}
 
-
 PRZYKŁAD KOMPLETNEGO PODEJŚCIA dla aplikacji z wieloma komponentami:
 1. Setup projektu (mkdir, vite, npm install)
 2. Instalacja dodatkowych zależności (np. react-router-dom)
 3. Wygenerowanie WSZYSTKICH wymaganych komponentów (nie skracaj!)
 4. Wygenerowanie komponentu głównego/listy z nawigacją
-5. Modifikacja App.tsx z routingiem i integracją wszystkich komponentów
+5. Modyfikacja App.tsx z routingiem i integracją wszystkich komponentów
 6. Uruchomienie dev servera (tylko jeśli nie działa już)
 
 Twoja odpowiedź **musi być poprawną tablicą JSON** zawierającą tylko obiekty kroków.
 Zaczynaj od nawiasu `[` i kończ nawiasem `]`. Żadnych komentarzy ani tekstu poza listą.
 """.strip()
 
-    return prompt
-
-
-def build_project_context(goal: str) -> str:
-    """Buduje kontekst istniejących komponentów"""
-    try:
-        from agent.context.builder import build_hybrid_context
-        
-        context = build_hybrid_context(
-            current_name="scenario_planning",
-            current_path="output/scenario.json",
-            prompt_text=goal,
-            full_code=False
-        )
-        
-        return context if context and context.strip() else "Brak istniejących komponentów do analizy."
-    except Exception as e:
-        return f"Błąd podczas budowania kontekstu: {str(e)}"
+   return prompt
 
 
 def load_previous_steps() -> list:
@@ -169,3 +126,17 @@ def format_previous_steps(steps: list) -> str:
         formatted_steps.append(f"{i}. {path}\n   Treść: {prompt}")
     
     return "\n".join(formatted_steps)
+
+
+def build_summary_prompt(state_json: str) -> str:
+   """
+   Buduje prompt do podsumowania aktualnego stanu agenta.
+   """
+   return f"""
+Na podstawie poniższego stanu agenta i jego historii wygeneruj krótkie podsumowanie w 2–3 zdaniach.
+Skup się na tym co zostało zbudowane i jaki jest aktualny stan projektu.
+Zakończ pytaniem: „Co dalej chcesz zbudować?"
+
+Stan agenta:
+{state_json}
+""".strip()

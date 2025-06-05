@@ -106,6 +106,12 @@ IGNORED_FILES = {
     "nuxt.config.js",
     "vue.config.js",
     "angular.json",
+    "eslint.config.js",
+    "README.md",
+    "vite-env.d.ts",
+    "vite.config.ts",
+    "tsconfig.node.json",
+    "tsconfig.app.json",
     
     # Other
     ".DS_Store",

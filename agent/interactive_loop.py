@@ -51,15 +51,15 @@ def interactive_loop():
                 log_hub.warn("AGENT", "⚠️ Pusty input – spróbuj jeszcze raz")
                 continue
 
-            fixed_input = fix_user_prompt(user_input)
-            log_hub.info("AGENT", f"🧪 Poprawiony prompt: {fixed_input}")
+            fixed_input, intention = fix_and_classify_prompt(user_input)
+            log_hub.info("AGENT", f"🧪 Poprawiony prompt: {fixed_input} [{intention}]")
 
-            prompt = build_scenario_prompt(fixed_input, constraints, mode="interactive")
+            prompt = build_scenario_prompt(fixed_input, constraints, mode="interactive", intention=intention)
 
             try:
                 response = llm.chat(prompt).strip()
                 with open(log_path, "a", encoding="utf-8") as f:
-                    f.write(f"\n\n--- Prompt ---\n{prompt}\n\n--- Response ---\n{response}\n")
+                    f.write(f"\n\n--- Intention: {intention} ---\n--- Prompt ---\n{prompt}\n\n--- Response ---\n{response}\n")
 
                 if response.startswith("```json"):
                     response = response.removeprefix("```json").removesuffix("```").strip()
@@ -68,7 +68,7 @@ def interactive_loop():
                 if not isinstance(steps_batch, list):
                     raise ValueError("LLM powinien zwrócić listę kroków")
 
-                log_hub.info("AGENT", f"📥 Dodano {len(steps_batch)} kroków")
+                log_hub.info("AGENT", f"📥 Dodano {len(steps_batch)} kroków [{intention}]")
                 steps.extend(steps_batch)
 
                 with open(scenario_path, "w", encoding="utf-8") as f:
@@ -88,23 +88,41 @@ def interactive_loop():
         log_hub.info("AGENT", "✅ Zakończono interaktywną sesję.")
 
 
-def fix_user_prompt(raw_input: str, model="gpt-4o") -> str:
+def fix_and_classify_prompt(raw_input: str, model="gpt-4o") -> tuple[str, str]:
+    """Poprawia prompt i klasyfikuje intencję w jednym wywołaniu LLM"""
     log_hub = get_log_hub()
     
-    fixer_prompt = f"""Popraw lub uzupełnij polecenie użytkownika, zachowując jego intencję.
-Usuń błędy językowe i spraw, by polecenie było możliwie jasne dla agenta AI.
-Zwróć tylko jedną poprawioną wersję bez dodatkowych komentarzy.
+    fixer_prompt = f"""Popraw polecenie użytkownika i sklasyfikuj jego intencję.
 
-Polecenie:
+Zwróć odpowiedź w formacie JSON:
+{{
+  "fixed_prompt": "poprawione i uzupełnione polecenie",
+  "intention": "infrastructure lub mixed"
+}}
+
+Kategorie:
+- infrastructure: jeśli tekst zawiera tylko pure setup/ops - instalacja, git clone, mkdir, npm install, npm create, npx, i tym podobne
+- mixed: wszystko inne - development, features, komponenty (DEFAULT)
+
+Polecenie użytkownika:
 {raw_input}
-
-Poprawione:
 """
+    
     try:
         llm = LLMClient(model=model)
-        result = llm.chat(fixer_prompt).strip()
-        log_hub.debug("AGENT", f"🔧 Prompt poprawiony: '{raw_input}' → '{result}'")
-        return result
+        response = llm.chat(fixer_prompt).strip()
+        
+        # Parse JSON response
+        if response.startswith("```json"):
+            response = response.removeprefix("```json").removesuffix("```").strip()
+        
+        result = json.loads(response)
+        fixed_prompt = result.get("fixed_prompt", raw_input)
+        intention = result.get("intention", "code_generation")
+        
+        log_hub.debug("AGENT", f"🔧 '{raw_input}' → '{fixed_prompt}' [{intention}]")
+        return fixed_prompt, intention
+        
     except Exception as e:
-        log_hub.error("AGENT", f"❌ Błąd poprawiania promptu: {e}")
-        return raw_input  # Fallback do oryginalnego
+        log_hub.error("AGENT", f"❌ Błąd fix+classify: {e}")
+        return raw_input, "code_generation"  # Safe fallback

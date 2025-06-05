@@ -48,9 +48,12 @@ def build_summary_prompt(language: str, content: str) -> str:
         return (
             f"Opisz, co robi ten kod źródłowy ({language}). "
             "Opisz efekt działania — co realizuje, jakie elementy udostępnia, co osiąga. "
-            "Wymień najważniejsze funkcje, klasy lub komponenty, ale bez opisywania ich wewnętrznej implementacji. "
+            "Wymień najważniejsze funkcje, klasy lub komponenty, bez opisywania implementacji. "
             "Nie podawaj nazw pliku, nie zgaduj, nie opisuj importów ani oczywistości. "
-            "Zacznij każde zdanie od czasownika. Styl: precyzyjny, zwięzły. Maksymalnie 10 zdań.\n\n"
+            "Zacznij każde zdanie od czasownika. Styl: precyzyjny, zwięzły. Dokładnie 10 zdań.\n\n"
+            "Metody - format: `nazwa(param: typ) -> typ`:\n"
+            "- Główne metody (8-12 słów opisu każda)\n"
+            "- Pomocnicze metody (4 słowa opisu każda)\n\n"
             f"{content_sample}"
         )
 

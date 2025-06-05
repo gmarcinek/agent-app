@@ -148,12 +148,12 @@ class MetaFileProcessor:
         
         # Przygotuj strukturę metadanych
         metadata = {
-            "meta": raw_data,
+            "path": rel_path,
+            "type": raw_data.get("type"),
+            "imports": raw_data.get("imports", []),
+            "exports": raw_data.get("exports", []),
+            "summary_path": None,  # TODO: implement
             "weight": weight,
-            "language": language,
-            "extension": extension,
-            "text": is_text,
-            "processed_at": path.stat().st_mtime,  # timestamp ostatniej modyfikacji
         }
         
         if self.config.get("debug"):

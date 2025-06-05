@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import datetime
 from agent.filesystem import FileSystem, get_flat_file_list_string
 from registry.process_manager import ProcessManager
 
@@ -44,7 +45,7 @@ KRYTYCZNE WYMAGANIA:
 - Jeśli potrzebujesz routingu, zainstaluj react-router-dom
 """
     elif mode == "interactive":
-        mode_instructions = "\n\nTryb interaktywny: Zwróć tylko **nowe** kroki — nie powielaj już wykonanych ani nie zmieniaj istniejących."
+        mode_instructions = "\n\nZaplanuj kroki potrzebne do realizacji celu, nawet jeśli podobne były już próbowane wcześniej. Nie powtarzaj scaffoldera aplikacji."
 
     prompt = f"""
 Jesteś agentem planującym działania kodującego agenta AI.
@@ -55,15 +56,19 @@ Masz za zadanie **KOMPLETNIE ZREALIZOWAĆ** cel: **{goal}**
 UWZGLĘDNIJ PONIŻSZE OGRANICZENIA:
 {constraints_txt}
 
-STRUKTURA PLIKÓW PROJEKTU:
-{file_structure}
-
 ISTNIEJĄCE KOMPONENTY I ICH FUNKCJONALNOŚĆ:
 {existing_context}
 
-OSTATNIO WYKONANE KROKI - START
+OSTATNIO WYKONANE KROKI
 {previous_steps_txt}
-OSTATNIO WYKONANE KROKI - END
+
+PRZYKŁAD KOMPLETNEGO PODEJŚCIA dla aplikacji z wieloma komponentami:
+1. Setup projektu (mkdir, vite, npm install)
+2. Instalacja dodatkowych zależności (np. react-router-dom)
+3. Wygenerowanie WSZYSTKICH wymaganych komponentów (nie skracaj!)
+4. Wygenerowanie komponentu głównego/listy z nawigacją
+5. Modifikacja App.tsx z routingiem i integracją wszystkich komponentów
+6. Uruchomienie dev servera (tylko jeśli nie działa już)
 
 KAŻDY KROK POWINIEN MIEĆ STRUKTURĘ:
 {{
@@ -88,19 +93,37 @@ DOSTĘPNE TYPY KROKÓW:
      "extension": ".tsx"
    }}
  }}
-
-
-PRZYKŁAD KOMPLETNEGO PODEJŚCIA dla aplikacji z wieloma komponentami:
-1. Setup projektu (mkdir, vite, npm install)
-2. Instalacja dodatkowych zależności (np. react-router-dom)
-3. Wygenerowanie WSZYSTKICH wymaganych komponentów (nie skracaj!)
-4. Wygenerowanie komponentu głównego/listy z nawigacją
-5. Modifikacja App.tsx z routingiem i integracją wszystkich komponentów
-6. Uruchomienie dev servera (tylko jeśli nie działa już)
+ 
+PRZYKŁADY POPRAWNYCH KROKÓW:
+{{
+  "name": "Modyfikacja komponentu App",
+  "type": "generate_code",
+  "params": {{
+    "prompt": "Zmodyfikuj komponent App w pliku App.tsx, aby wyświetlał aktualną godzinę...",
+    "artifact": {{
+      "name": "App.tsx",
+      "path": "output/app/src/App.tsx",
+      "extension": ".tsx"
+    }}
+  }}
+}},
+{{
+  "name": "Instalacja zależności",
+  "type": "run_script", 
+  "params": {{
+    "command": "npm install",
+    "cwd": "output/app",
+    "dev_server_mode": false
+  }}
+}}
 
 Twoja odpowiedź **musi być poprawną tablicą JSON** zawierającą tylko obiekty kroków.
 Zaczynaj od nawiasu `[` i kończ nawiasem `]`. Żadnych komentarzy ani tekstu poza listą.
+
+{mode_instructions}
 """.strip()
+
+    log_scenario_prompt_to_file(goal, mode, prompt)
 
     return prompt
 
@@ -111,10 +134,7 @@ def build_project_context(goal: str) -> str:
         from agent.context.builder import build_hybrid_context
         
         context = build_hybrid_context(
-            current_name="scenario_planning",
-            current_path="output/scenario.json",
             prompt_text=goal,
-            full_code=False
         )
         
         return context if context and context.strip() else "Brak istniejących komponentów do analizy."
@@ -160,7 +180,7 @@ def format_previous_steps(steps: list) -> str:
         return "Brak poprzednich kroków typu generate_code."
     
     formatted_steps = []
-    for i, step in enumerate(code_steps[-40:], 1):  # Ostatnie 40 kroków generate_code
+    for i, step in enumerate(code_steps[-10:], 1):  # Ostatnie 10 kroków generate_code
         params = step.get('params', {})
         artifact = params.get('artifact', {})
         path = artifact.get('path', 'Nieznana ścieżka')
@@ -169,3 +189,29 @@ def format_previous_steps(steps: list) -> str:
         formatted_steps.append(f"{i}. {path}\n   Treść: {prompt}")
     
     return "\n".join(formatted_steps)
+
+def log_scenario_prompt_to_file(goal: str, mode: str, prompt: str):
+    """Loguje gotowy prompt scenariusza do pliku z timestampem."""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_path = f"output/logs/scenario.{timestamp}.context.txt"
+    
+    # Upewnij się że katalog istnieje
+    os.makedirs("output/logs", exist_ok=True)
+    
+    log_content = f"""=== SCENARIO PROMPT LOG ===
+Timestamp: {datetime.now().isoformat()}
+Goal: {goal}
+Mode: {mode}
+Prompt length: {len(prompt)} chars
+
+=== FULL SCENARIO PROMPT ===
+{prompt}
+
+=== END OF SCENARIO PROMPT ===
+"""
+    
+    try:
+        with open(log_path, "w", encoding="utf-8") as f:
+            f.write(log_content)
+    except Exception as e:
+        print(f"Warning: Could not log scenario prompt to {log_path}: {e}")

@@ -1,7 +1,7 @@
 import os
 import json
 from agent.state import AgentState, Scenario
-from agent.llm.use_llm import LLMClient
+from llm import LLMClient, Models
 from agent.input import AgentInput
 from agent.prompt.scenario_prompt_builder import build_scenario_prompt
 from agent.loop import agent_loop
@@ -41,7 +41,7 @@ def interactive_loop():
         with open(scenario_path, encoding="utf-8") as f:
             steps = json.load(f)
 
-    llm = LLMClient(model="gpt-4o")
+    llm = LLMClient(Models.CLAUDE_4_SONNET)
     os.makedirs(os.path.dirname(log_path), exist_ok=True)
 
     try:
@@ -88,7 +88,7 @@ def interactive_loop():
         log_hub.info("AGENT", "✅ Zakończono interaktywną sesję.")
 
 
-def fix_and_classify_prompt(raw_input: str, model="gpt-4o") -> tuple[str, str]:
+def fix_and_classify_prompt(raw_input: str) -> tuple[str, str]:
     """Poprawia prompt i klasyfikuje intencję w jednym wywołaniu LLM"""
     log_hub = get_log_hub()
     
@@ -109,7 +109,7 @@ Polecenie użytkownika:
 """
     
     try:
-        llm = LLMClient(model=model)
+        llm = LLMClient(Models.GPT_4O_MINI)
         response = llm.chat(fixer_prompt).strip()
         
         # Parse JSON response

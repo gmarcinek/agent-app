@@ -3,19 +3,16 @@ import os
 from datetime import datetime
 from agent.context.builder import build_hybrid_context
 
-def build_prompt(prompt_text: str, artifact_name: str, artifact_path: str, context_mode: str = "meta_only") -> str:
+def build_prompt(prompt_text: str, artifact_name: str, artifact_path: str) -> str:
     """
     Buduje prompt dla LLM na podstawie:
     - prompt_text: główna treść zadania do wykonania
     - artifact_name: nazwa artefaktu (komponentu)
     - artifact_path: dokładna ścieżka do pliku z scenario
-    - context_mode: czy dołączyć pełny kod poprzednich komponentów czy tylko meta
     """
     context = build_hybrid_context(
-        current_name=artifact_name,
         current_path=artifact_path,
         prompt_text=prompt_text,
-        full_code=(context_mode == "full_code")
     )
 
     prompt = f"""

@@ -1,32 +1,33 @@
 import json
 import os
+from datetime import datetime
 from agent.filesystem import FileSystem, get_flat_file_list_string
 
 def build_initial_scenario_prompt(goal: str, constraints: list[str], mode: str = "initial", registry=None) -> str:
-   """
-   Buduje prompt do generowania scenariusza w trybie inicjalnym lub interaktywnym,
-   z uwzględnieniem struktury plików i stanu dev servera.
-   """
-   constraints_txt = "\n".join(f"- {c}" for c in constraints) if constraints else "- Brak dodatkowych ograniczeń"
+    """
+    Buduje prompt do generowania scenariusza w trybie inicjalnym lub interaktywnym,
+    z uwzględnieniem struktury plików i stanu dev servera.
+    """
+    constraints_txt = "\n".join(f"- {c}" for c in constraints) if constraints else "- Brak dodatkowych ograniczeń"
 
-   fs = FileSystem(base_path="output")
-   file_structure = fs.get_flat_file_list_string()
+    fs = FileSystem(base_path="output")
+    file_structure = fs.get_flat_file_list_string()
 
-   # Wczytaj historię poprzednich kroków
-   previous_steps = load_previous_steps()
-   previous_steps_txt = format_previous_steps(previous_steps) if previous_steps else "Brak poprzednich kroków."
+    # Wczytaj historię poprzednich kroków
+    previous_steps = load_previous_steps()
+    previous_steps_txt = format_previous_steps(previous_steps) if previous_steps else "Brak poprzednich kroków."
 
-   # Dodatkowe instrukcje w zależności od trybu
-   mode_instructions = ""
-   if mode == "initial":
-       mode_instructions = """
+    # Dodatkowe instrukcje w zależności od trybu
+    mode_instructions = ""
+    if mode == "initial":
+        mode_instructions = """
 KRYTYCZNE WYMAGANIA:
 - Scenariusz musi być KOMPLETNY i zawierać WSZYSTKIE kroki do pełnej realizacji celu
 """
-   elif mode == "interactive":
-       mode_instructions = "\n\nTryb interaktywny: Zwróć tylko **nowe** kroki — nie powielaj już wykonanych ani nie zmieniaj istniejących."
+    elif mode == "interactive":
+        mode_instructions = "\n\nTryb interaktywny: Zwróć tylko **nowe** kroki — nie powielaj już wykonanych ani nie zmieniaj istniejących."
 
-   prompt = f"""
+    prompt = f"""
 Jesteś agentem planującym działania kodującego agenta AI.
 
 Masz za zadanie **KOMPLETNIE ZREALIZOWAĆ** cel: **{goal}**
@@ -74,9 +75,11 @@ PRZYKŁAD KOMPLETNEGO PODEJŚCIA dla aplikacji z wieloma komponentami:
 
 Twoja odpowiedź **musi być poprawną tablicą JSON** zawierającą tylko obiekty kroków.
 Zaczynaj od nawiasu `[` i kończ nawiasem `]`. Żadnych komentarzy ani tekstu poza listą.
-""".strip()
+""" .strip()
 
-   return prompt
+    log_scenario_prompt_to_file(goal, mode, prompt)
+
+    return prompt
 
 
 def load_previous_steps() -> list:
@@ -128,15 +131,28 @@ def format_previous_steps(steps: list) -> str:
     return "\n".join(formatted_steps)
 
 
-def build_summary_prompt(state_json: str) -> str:
-   """
-   Buduje prompt do podsumowania aktualnego stanu agenta.
-   """
-   return f"""
-Na podstawie poniższego stanu agenta i jego historii wygeneruj krótkie podsumowanie w 2–3 zdaniach.
-Skup się na tym co zostało zbudowane i jaki jest aktualny stan projektu.
-Zakończ pytaniem: „Co dalej chcesz zbudować?"
+def log_scenario_prompt_to_file(goal: str, mode: str, prompt: str):
+    """Loguje gotowy prompt scenariusza do pliku z timestampem."""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_path = f"output/logs/scenario.{timestamp}.context.txt"
+    
+    # Upewnij się że katalog istnieje
+    os.makedirs("output/logs", exist_ok=True)
+    
+    log_content = f"""=== SCENARIO PROMPT LOG ===
+Timestamp: {datetime.now().isoformat()}
+Goal: {goal}
+Mode: {mode}
+Prompt length: {len(prompt)} chars
 
-Stan agenta:
-{state_json}
-""".strip()
+=== FULL SCENARIO PROMPT ===
+{prompt}
+
+=== END OF SCENARIO PROMPT ===
+"""
+    
+    try:
+        with open(log_path, "w", encoding="utf-8") as f:
+            f.write(log_content)
+    except Exception as e:
+        print(f"Warning: Could not log scenario prompt to {log_path}: {e}")

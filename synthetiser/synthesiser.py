@@ -91,11 +91,12 @@ def update_file_entry(path: Path, files_data: dict, dependencies: dict, symbols_
     print(f"🔤 Język: {lang}, rozszerzenie: {ext}, tekst: {is_text}")
 
     files_data[rel_path] = {
-        "meta": data,
+        "path": rel_path,
+        "type": data.get("type"),
+        "imports": data.get("imports", []),
+        "exports": data.get("exports", []),
+        "summary_path": None,
         "weight": assign_weight(rel_path),
-        "language": lang,
-        "extension": ext,
-        "text": is_text
     }
 
     dependencies[rel_path] = data.get("imports", [])

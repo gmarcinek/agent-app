@@ -1,6 +1,7 @@
 import os
 import shutil
 from logger import get_log_hub
+from constants.constants import IGNORED_DIRS
 
 class FileSystem:
     def __init__(self, base_path: str = "output"):
@@ -85,16 +86,37 @@ class FileSystem:
             self.log_hub.error("FILESYSTEM", f"Błąd skanowania katalogów: {e}")
             raise
         return all_files
+    
+    def is_ignored_path(self, file_path: str) -> bool:
+        """Sprawdza czy ścieżka zawiera ignorowane katalogi"""
+        path_parts = file_path.split(os.sep)
+        return any(ignored_dir in path_parts for ignored_dir in IGNORED_DIRS)
 
     def get_flat_file_list_string(self) -> str:
+        """Zwraca tylko pliki z katalogu projektu (output/app)"""
         try:
-            files = self.get_flat_file_list()
-            filtered = [f for f in files if os.sep + "node_modules" + os.sep not in f and os.sep + "logs" + os.sep not in f]
-            if not filtered:
-                return f"(Brak plików w katalogu '{self.base_path}')"
-            return "\n".join(filtered)
+            app_path = os.path.join(self.base_path, "app") 
+            if not os.path.exists(app_path):
+                return "(Projekt nie istnieje)"
+                
+            # Skanuj tylko output/app
+            temp_fs = FileSystem(app_path)
+            files = temp_fs.get_flat_file_list()
+            
+            # Konwertuj bezwzględne ścieżki na relatywne względem app_path
+            relative_files = []
+            for f in files:
+                if f.startswith(app_path):
+                    rel_path = os.path.relpath(f, app_path)
+                    relative_files.append(rel_path)
+            
+            # Dodaj prefix i filtruj
+            project_files = [f"output/app/{f.replace(os.sep, '/')}" for f in relative_files]
+            filtered = [f for f in project_files if not self.is_ignored_path(f)]
+            
+            return "\n".join(filtered) if filtered else "(Brak plików w projekcie)"
         except Exception as e:
-            self.log_hub.error("FILESYSTEM", f"Błąd generowania listy plików: {e}")
+            self.log_hub.error("FILESYSTEM", f"Błąd generowania listy plików projektu: {e}")
             raise
 
 # Funkcja pomocnicza do użycia bezpośrednio

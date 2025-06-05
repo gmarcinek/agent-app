@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-start.py - Python Orchestrator using ProcessManager with tmux terminal split
-Uruchamia analyser/synthetiser w tle, logi w górnym panelu, agent interactive w dolnym
+start.py - Simplified Python Orchestrator using ProcessManager
+Uruchamia analyser/synthetiser w tle, następnie agent interactive w tym samym terminalu
 """
 
 import os
@@ -10,7 +10,6 @@ import signal
 import subprocess
 import time
 import atexit
-import shutil
 from pathlib import Path
 
 # Setup encoding
@@ -31,104 +30,6 @@ log_hub = get_log_hub()
 # Register orchestrator module
 log_hub.register_module("ORCHESTRATOR", "🎯", "blue")
 
-def check_tmux_available():
-    """Sprawdź czy tmux jest dostępny"""
-    return shutil.which("tmux") is not None
-
-def start_with_tmux():
-    """Uruchom aplikację w tmux z podziałem terminala"""
-    session_name = "agent-session"
-    
-    # Zabij istniejącą sesję jeśli istnieje
-    subprocess.run(["tmux", "kill-session", "-t", session_name], 
-                  capture_output=True, check=False)
-    
-    try:
-        # Utwórz nową sesję w tle
-        log_hub.info("ORCHESTRATOR", "Creating tmux session...")
-        subprocess.run(["tmux", "new-session", "-d", "-s", session_name], check=True)
-        
-        # Podziel okno: 70% góra (logi), 30% dół (interactive)
-        log_hub.info("ORCHESTRATOR", "Splitting terminal...")
-        subprocess.run(["tmux", "split-window", "-v", "-p", "30", "-t", session_name], check=True)
-        
-        # Górny panel - logi (background processes)
-        log_hub.info("ORCHESTRATOR", "Starting background processes in upper panel...")
-        subprocess.run(["tmux", "select-pane", "-t", f"{session_name}:0.0"], check=True)
-        
-        # Uruchom orchestrator w górnym panelu (bez interactive agenta)
-        cmd_upper = f"cd '{os.getcwd()}' && python -c \"" \
-                   f"from orchestrator.start import start_background_only; " \
-                   f"start_background_only()\""
-        subprocess.run(["tmux", "send-keys", "-t", f"{session_name}:0.0", cmd_upper, "Enter"], check=True)
-        
-        # Dolny panel - interactive agent
-        log_hub.info("ORCHESTRATOR", "Starting interactive agent in lower panel...")
-        subprocess.run(["tmux", "select-pane", "-t", f"{session_name}:0.1"], check=True)
-        
-        # Krótka pauza żeby background procesy się uruchomiły
-        time.sleep(3)
-        
-        cmd_lower = f"cd '{os.getcwd()}' && poetry run agent"
-        subprocess.run(["tmux", "send-keys", "-t", f"{session_name}:0.1", cmd_lower, "Enter"], check=True)
-        
-        # Ustaw focus na dolny panel (interactive)
-        subprocess.run(["tmux", "select-pane", "-t", f"{session_name}:0.1"], check=True)
-        
-        log_hub.info("ORCHESTRATOR", "Attaching to tmux session...")
-        log_hub.info("ORCHESTRATOR", "Use Ctrl+B then D to detach, Ctrl+C to stop")
-        
-        # Attach do sesji
-        subprocess.run(["tmux", "attach-session", "-t", session_name])
-        
-        return 0
-        
-    except subprocess.CalledProcessError as e:
-        log_hub.error("ORCHESTRATOR", f"Failed to setup tmux session: {e}")
-        return 1
-    except KeyboardInterrupt:
-        log_hub.info("ORCHESTRATOR", "Interrupted - cleaning up tmux session...")
-        subprocess.run(["tmux", "kill-session", "-t", session_name], 
-                      capture_output=True, check=False)
-        return 0
-
-def start_background_only():
-    """Uruchom tylko background procesy (dla górnego panelu tmux)"""
-    global manager
-    
-    # Setup signal handling dla background procesów
-    signal.signal(signal.SIGINT, signal.SIG_IGN)  # Ignoruj Ctrl+C w background
-    signal.signal(signal.SIGTERM, lambda s, f: cleanup_processes())
-    
-    # Initialize ProcessManager
-    manager = ProcessManager()
-    
-    log_hub.info("ORCHESTRATOR", "Starting background processes (analyser + synthetiser)...")
-    
-    # Start background processes
-    manager.start_all()
-    
-    # Check status
-    running_processes = manager.get_running_processes()
-    if running_processes:
-        log_hub.info("ORCHESTRATOR", f"Background processes running: {', '.join(running_processes)}")
-        log_hub.info("ORCHESTRATOR", "Background logs will appear here...")
-        
-        # Trzymaj proces żywy i wyświetlaj logi
-        try:
-            while True:
-                time.sleep(1)
-                # Sprawdź czy procesy nadal działają
-                if not manager.get_running_processes():
-                    log_hub.warn("ORCHESTRATOR", "All background processes stopped")
-                    break
-        except:
-            pass
-    else:
-        log_hub.error("ORCHESTRATOR", "No background processes started")
-    
-    cleanup_processes()
-
 def cleanup_processes():
     """Clean up all processes using ProcessManager"""
     global manager
@@ -147,19 +48,10 @@ def main():
     """Main orchestrator function"""
     global manager
     
-    log_hub.info("ORCHESTRATOR", "Starting Agent App Orchestrator")
+    print("🎯 Agent App Orchestrator")
+    print("=" * 50)
     
-    # Sprawdź czy tmux jest dostępny
-    if check_tmux_available():
-        log_hub.info("ORCHESTRATOR", "tmux detected - using split terminal mode")
-        return start_with_tmux()
-    else:
-        log_hub.warn("ORCHESTRATOR", "tmux not available - falling back to single terminal mode")
-        return start_single_terminal()
-
-def start_single_terminal():
-    """Fallback - uruchom w pojedynczym terminalu (stara logika)"""
-    global manager
+    log_hub.info("ORCHESTRATOR", "Starting Agent App Orchestrator")
     
     # Setup signal handling
     signal.signal(signal.SIGINT, signal_handler)
@@ -167,36 +59,49 @@ def start_single_terminal():
     atexit.register(cleanup_processes)
     
     # Initialize ProcessManager
+    print("📦 Initializing ProcessManager...")
     manager = ProcessManager()
     
+    print("🚀 Starting background processes...")
     log_hub.info("ORCHESTRATOR", "Starting background processes...")
     
     # Start background processes (analyser + synthetiser)
     manager.start_all()
     
-    # Give processes time to start
-    time.sleep(3)
+    print("⏳ Waiting for processes to initialize...")
+    # Give processes time to start with progress indicator
+    for i in range(3):
+        time.sleep(1)
+        print(f"   {i+1}/3 seconds...")
     
     # Check what actually started
     running_processes = manager.get_running_processes()
     if not running_processes:
+        print("❌ No background processes started - exiting")
         log_hub.error("ORCHESTRATOR", "No background processes started - exiting")
         return 1
+    
+    print(f"✅ Started {len(running_processes)} background processes:")
+    for process in running_processes:
+        print(f"   • {process}")
     
     log_hub.info("ORCHESTRATOR", f"Started {len(running_processes)} background processes: {', '.join(running_processes)}")
     
     # Show status
+    print("🤖 Starting interactive agent...")
+    print("   Use Ctrl+C to stop all processes")
+    print("=" * 50)
+    
     log_hub.info("ORCHESTRATOR", "Starting agent in foreground...")
     log_hub.info("ORCHESTRATOR", "Background processes running. Use Ctrl+C to stop all.")
-    log_hub.info("ORCHESTRATOR", "Background processes managed by ProcessManager")
     
     try:
-        # Start agent in foreground - bez przechwytywania output
+        # Start agent in foreground
         result = subprocess.run(
             ["poetry", "run", "agent"],
             cwd=".",
-            stdout=None,  # Pozwól na bezpośredni output do konsoli
-            stderr=None   # Pozwól na bezpośredni output do konsoli
+            stdout=None,  # Direct output to console
+            stderr=None   # Direct output to console
         )
         
         log_hub.info("ORCHESTRATOR", "Agent finished")

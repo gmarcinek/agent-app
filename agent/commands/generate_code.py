@@ -14,7 +14,6 @@ class GenerateCodeCommand(Command):
         artifact_name = artifact["name"]
         filepath = artifact["path"]  # Mamy już path!
         extension = artifact.get("extension", "")
-        context_mode = self.params.get("context_mode", "meta_only")
 
         # 📁 Jeśli to folder – tylko utwórz katalog
         if not extension and not os.path.splitext(filepath)[1]:
@@ -33,7 +32,6 @@ class GenerateCodeCommand(Command):
             prompt_text=prompt_text,
             artifact_name=artifact_name,
             artifact_path=filepath,  # ← DODAJ PATH
-            context_mode=context_mode
         )
 
         code, validation_report = validate_and_recreate(

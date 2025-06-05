@@ -14,7 +14,6 @@ class PatchFileCommand(Command):
         artifact_name = artifact["name"]
         filepath = artifact["path"]
         extension = artifact.get("extension", "")
-        context_mode = self.params.get("context_mode", "meta_only")
 
         # 📁 Sprawdź czy plik istnieje (patch wymaga istniejącego pliku)
         if not os.path.exists(filepath):
@@ -47,7 +46,6 @@ class PatchFileCommand(Command):
             prompt_text=prompt_text,
             artifact_name=artifact_name,
             artifact_path=filepath,
-            context_mode=context_mode
         )
 
         code, validation_report = validate_and_patch(

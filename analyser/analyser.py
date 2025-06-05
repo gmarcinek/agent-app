@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 from analyser.writer import write_analysis
 from analyser.tree_parser import parse_code_file
-from agent.llm.use_llm import LLMClient
+from llm import LLMClient, Models
 from dotenv import load_dotenv
 from constants.constants import LANGUAGE_MAP
 
@@ -106,7 +106,7 @@ async def analyze_file(path: str):
     if language == "gitignore" or prompt is None:
         summary = "Plik jest ignorowany (np. .gitignore) lub nie wymaga podsumowania."
     else:
-        llm = LLMClient(model="gpt-4o-mini")
+        llm = LLMClient(Models.QWEN_CODER_32B)
         try:
             summary = llm.chat(prompt).strip()
         except Exception as e:
@@ -115,15 +115,11 @@ async def analyze_file(path: str):
 
     meta = {
         "path": path,
-        "language": language,
-        "type": parsed_data.get("type", "unknown"),
-        "tokens": len(content.split()),
-        "lines": len(content.splitlines()),
-        "size_bytes": len(content.encode("utf-8")),
+        "type": parsed_data.get("type"),
         "imports": parsed_data.get("imports", []),
         "exports": parsed_data.get("exports", []),
         "summary_path": None,
-        "embedding_ref": None,
+        "weight": 1.0,
     }
 
     md_content = build_md_content(path, meta, summary)

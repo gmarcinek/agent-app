@@ -1,8 +1,8 @@
 import os
 from agent.validation.static import analyze_file
-from agent.llm.use_llm import LLMClient
+from llm import LLMClient, Models
 
-llm = LLMClient()
+llm = LLMClient(Models.QWEN_CODER_32B)
 
 SUPPORTED_LINT_EXTENSIONS = [".tsx", ".ts", ".js", ".jsx", ".py", ".html"]
 

@@ -2,12 +2,12 @@ import os
 import json
 import re
 from agent.input import AgentInput
-from agent.llm.use_llm import LLMClient
+from llm import LLMClient, Models
 from agent.prompt.scenario_prompt_builder import build_scenario_prompt
 from agent.prompt.initial_scenario_prompt import build_initial_scenario_prompt
 
 def plan_scenario(agent_input: AgentInput) -> list[dict]:
-    llm = LLMClient(model="gpt-4o")
+    llm = LLMClient(Models.CLAUDE_4_SONNET)
 
     # Sprawdź czy istnieje scenario.json w output
     scenario_path = "output/scenario.json"

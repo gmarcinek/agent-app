@@ -61,7 +61,7 @@ COMMON_TEXT_FILES = {
 }
 
 
-IGNORED_DIRS = {"node_modules", ".git", ".meta", "__pycache__", ".vscode", ".idea", "dist", "build", "coverage"}
+IGNORED_DIRS = {"node_modules", ".git", ".meta", ".synth", "__pycache__", ".vscode", ".idea", "dist", "build", "coverage"}
 
 # Dodaj ignorowane pliki
 IGNORED_FILES = {
